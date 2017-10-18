@@ -126,7 +126,7 @@ test_iter = infinite_data(test_loader)
 if args.deform_reuse == 0:
     recompute_cache_every = (len(dataset) * args.deform_cache / args.batch_size)
 else:
-    recompute_cache_every = args.deform_reuse / args.batch_size
+    recompute_cache_every = args.deform_cache * args.deform_reuse / args.batch_size
 recompute_cache_every = max(1, recompute_cache_every)
 print 'Will recompute cache every {} iterations'.format(recompute_cache_every)
 
