@@ -126,7 +126,8 @@ test_iter = infinite_data(test_loader)
 if args.deform_reuse == 0:
     recompute_cache_every = (len(dataset) * args.deform_cache / args.batch_size)
 else:
-    recompute_cache_every = args.deform_reuse / args.batch_size
+    recompute_cache_every = args.deform_cache * args.deform_reuse / args.batch_size
+recompute_cache_every = max(1, recompute_cache_every)
 print 'Will recompute cache every {} iterations'.format(recompute_cache_every)
 
 # Prepare models
@@ -185,7 +186,7 @@ for iteration in tqdm(xrange(args.iterations)):
         log.add_image('train', gallery_train, iteration)
         log.add_image('reconstruction', gallery_rec, iteration)
         # Generate 100 images
-        samples = vae.generate(args.generate_samples)
+        samples = vae.generate(args.generate_samples, use_cuda=args.cuda)
         gallery_gen = torchvision.utils.make_grid(samples.data, normalize=True, range=(0,1))
         log.add_image('generation', gallery_gen, iteration)
 
