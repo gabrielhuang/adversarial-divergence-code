@@ -30,13 +30,12 @@ def aux_count(amount, coins, n_coins):
     return solutions
     
 
-   
+if __name__ == '__main__':
+    print '2 for 10', aux(10, range(10), 2)
+    print '3 for 10', aux(10, range(10), 3)
+    print '2 for 10', aux_count(10, range(10), 2)
+    print '3 for 10', aux_count(10, range(10), 3)
 
-print '2 for 10', aux(10, range(10), 2)
-print '3 for 10', aux(10, range(10), 3)
-print '2 for 10', aux_count(10, range(10), 2)
-print '3 for 10', aux_count(10, range(10), 3)
-
-for i in xrange(2, 10):
-    print '{} for {}'.format(i, 10), aux_count(10, range(10), i)
-    print '{} for {}'.format(i, i*5), aux_count(i*5, range(10), i)
+    for i in xrange(2, 10):
+        print '{} for {}'.format(i, 10), aux_count(10, range(10), i)
+        print '{} for {}'.format(i, i*5), aux_count(i*5, range(10), i)
