@@ -1,7 +1,9 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
+from sklearn.preprocessing import OneHotEncoder
 import coins
+
 
 class HyperplaneCachedDataset(Dataset):
     def __init__(self, amount, coins, n_coins, one_hot=False, use_float=True):
@@ -21,6 +23,9 @@ class HyperplaneCachedDataset(Dataset):
 
         self.generate()
 
+        if self.one_hot:
+            self.onehot_encoder = OneHotEncoder(sparse=False).fit(np.arange(10).reshape(-1, 1))
+
     def generate(self):
         self.combinations = coins.aux(self.amount, self.coins, self.n_coins)
 
@@ -30,12 +35,14 @@ class HyperplaneCachedDataset(Dataset):
     def __getitem__(self, idx):
         c = self.combinations[idx]
         if self.one_hot:
-            raise Exception('Not implemented, and probably not needed')
+            c_encoded = self.onehot_encoder.transform(np.asarray(c).reshape(-1, 1))
+            return torch.Tensor(c_encoded)
         else:
             if self.use_float:
                 return torch.Tensor(c)
             else:
                 return torch.LongTensor(c)
+
 
 if __name__ == '__main__':
     dataset = HyperplaneCachedDataset(3, range(10), 3)
