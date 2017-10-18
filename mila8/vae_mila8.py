@@ -132,13 +132,14 @@ class VAE(nn.Module):
         z = self.reparameterize(mu, logvar)
         return self.decode(z), mu, logvar
 
-    def generate(self, batch_size=100, noise=None, volatile=False):
+    def generate(self, batch_size=100, noise=None, volatile=False, use_cuda=True):
         '''
         n is either integer or latent variable
         '''
         if noise is None:
             noise = torch.randn(batch_size, self.latent, 1, 1)
-            noise = noise.cuda()
+            if use_cuda:
+                noise = noise.cuda()
             noise = Variable(noise, volatile=volatile)
         samples = self.decode(noise)
         return samples
