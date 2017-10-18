@@ -26,6 +26,69 @@ def build_cnn(sizes, batchnorm=True, deconv=False):
     return modules
 
 
+def get_sizes(latent, resolution):
+    encoder_sizes = [
+        [1, None, None, None],
+        # 512 x 512 - 1
+        [16, 4, 2, 1],
+        # 256 x 256 - 16
+        [16, 4, 2, 1],
+        # 128 x 128 - 16
+        [32, 4, 2, 1],
+        # 64 x 64 - 32
+        [64, 4, 2, 1],
+        # 32 x 32 - 64
+        [128, 4, 2, 1],
+        # 16 x 16 - 128
+        [128, 4, 2, 1],
+        # 8 x 8 - 128
+        [128, 4, 2, 1],
+        # 4 x 4 - 128
+        [128, 4, 1, 0],
+        # 1 x 1 - 128
+    ]
+
+    decoder_sizes = [
+        [latent, None, None, None],
+        # 1 x 1 - latent
+        [128, 4, 1, 0],
+        # 4 x 4 - 128
+        [128, 4, 2, 1],
+        # 8 x 8 - 128
+        [128, 4, 2, 1],
+        # 16 x 16 - 128
+        [64, 4, 2, 1],
+        # 32 x 32 - 64
+        [32, 4, 2, 1],
+        # 64 x 64 - 32
+        [16, 4, 2, 1],
+        # 128 x 128 - 16
+        [16, 4, 2, 1],
+        # 256 x 256 - 16
+        [1, 4, 2, 1],
+        # 512 x 512 - 1
+    ]
+
+    # Truncate VAE for smaller sizes
+    if resolution == 256:
+        encoder_sizes = encoder_sizes[1:]
+        decoder_sizes = decoder_sizes[:-1]
+    elif resolution == 128:
+        encoder_sizes = encoder_sizes[2:]
+        decoder_sizes = decoder_sizes[:-2]
+    elif resolution == 64:
+        encoder_sizes = encoder_sizes[3:]
+        decoder_sizes = decoder_sizes[:-3]
+    elif resolution == 32:
+        encoder_sizes = encoder_sizes[4:]
+        decoder_sizes = decoder_sizes[:-4]
+    # Make input and output channels consistent with data
+    encoder_sizes[0][0] = 1  # set input channels to 1
+    decoder_sizes[-1][0] = 1  # set output channels to 1
+
+    return encoder_sizes, decoder_sizes
+
+
 class VAE(nn.Module):
     def __init__(self, latent, resolution, batchnorm=True):
         super(VAE, self).__init__()
@@ -34,64 +97,8 @@ class VAE(nn.Module):
         self.resolution = resolution
         self.batchnorm = batchnorm
 
-        self.encoder_sizes = [
-            [1, None, None, None],
-            # 512 x 512 - 1
-            [16, 4, 2, 1],
-            # 256 x 256 - 16
-            [16, 4, 2, 1],
-            # 128 x 128 - 16
-            [32, 4, 2, 1],
-            # 64 x 64 - 32
-            [64, 4, 2, 1],
-            # 32 x 32 - 64
-            [128, 4, 2, 1],
-            # 16 x 16 - 128
-            [128, 4, 2, 1],
-            # 8 x 8 - 128
-            [128, 4, 2, 1],
-            # 4 x 4 - 128
-            [128, 4, 1, 0],
-            # 1 x 1 - 128
-        ]
-
-        self.decoder_sizes = [
-            [self.latent, None, None, None],
-            # 1 x 1 - latent
-            [128, 4, 1, 0],
-            # 4 x 4 - 128
-            [128, 4, 2, 1],
-            # 8 x 8 - 128
-            [128, 4, 2, 1],
-            # 16 x 16 - 128
-            [64, 4, 2, 1],
-            # 32 x 32 - 64
-            [32, 4, 2, 1],
-            # 64 x 64 - 32
-            [16, 4, 2, 1],
-            # 128 x 128 - 16
-            [16, 4, 2, 1],
-            # 256 x 256 - 16
-            [1, 4, 2, 1],
-            # 512 x 512 - 1
-        ]
-
-        # Truncate VAE for smaller sizes
-        if resolution == 256:
-            self.encoder_sizes = self.encoder_sizes[1:]
-            self.decoder_sizes = self.decoder_sizes[:-1]
-        elif resolution == 128:
-            self.encoder_sizes = self.encoder_sizes[2:]
-            self.decoder_sizes = self.decoder_sizes[:-2]
-        elif resolution == 64:
-            self.encoder_sizes = self.encoder_sizes[3:]
-            self.decoder_sizes = self.decoder_sizes[:-3]
-        elif resolution == 32:
-            self.encoder_sizes = self.encoder_sizes[4:]
-            self.decoder_sizes = self.decoder_sizes[:-4]
-        # Make input and output channels consistent with data
-        self.encoder_sizes[0][0] = 1  # set input channels to 1
-        self.decoder_sizes[-1][0] = 1  # set output channels to 1
+        # Build network sizes
+        self.encoder_sizes, self.decoder_sizes = get_sizes(latent, resolution)
 
         # Build encoder
         self.encoder_modules = build_cnn(self.encoder_sizes,
