@@ -6,19 +6,17 @@ import argparse
 import time
 
 
-parser = argparse.ArgumentParser(description='Train a GAN on scattering coefficients')
+parser = argparse.ArgumentParser(description='Train a GAN on digits')
 parser.add_argument('-l', '--latent', default=100, type=int, help='number of latent dimensions')
 parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient penalty')
 parser.add_argument('-i', '--iterations', default=200000, type=int, help='number of iterations')
 parser.add_argument('--batch-size', default=64, type=int, help='minibatch batch size')
 parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
 parser.add_argument('--model', default='gan')
-parser.add_argument('--data', required=True, help='path to .h5 file created with prepare_h5dataset.py')
 parser.add_argument('--logdir', required=True, help='where to log samples and models')
 parser.add_argument('--double-sided', action='store_true', help='whether to use double-sided penalty')
 parser.add_argument('--save-samples', default=100, type=int, help='save samples every N iterations')
 parser.add_argument('--save-models', default=5000, type=int, help='save models every N iterations')
-parser.add_argument('--buffer', default=1000, type=int, help='buffer size in MBytes. 0 for no buffer.')
 parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
 parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
 parser.add_argument('--use-cuda', default=False, type=bool, help='whether to use cuda')
@@ -135,9 +133,6 @@ class DigitGenerator(nn.Module):
 
 
 class DigitDiscriminator(nn.Module):
-    SCAT_CHANNELS = 81
-    SCAT_HEIGHT = 7
-    SCAT_WIDTH = 7
 
     def __init__(self):
         nn.Module.__init__(self)
