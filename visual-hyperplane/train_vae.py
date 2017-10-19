@@ -8,6 +8,9 @@ import torch.optim as optim
 import math
 import numpy as np
 
+import visdom
+vis = visdom.Visdom()
+
 def softmax(input):
     output = Variable(torch.zeros(input.size()))
     for i in range(input.size()[1]):
@@ -25,15 +28,17 @@ n_epochs = 1000
 n_x = 5
 n_z = 100
 lr = 3e-4
+opts = dict(numbins=45, xtickmin=0, xtickmax=45)
 
 dataset = HyperplaneCachedDataset(25, range(10), n_x)
-data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+dataset = dataset[:].numpy()
+np.random.shuffle(dataset)
 
-dataiter = iter(data_loader)
-examples = dataiter.next()[:10]
-data = dataset[:]
+train_set, test_set = dataset[:1000], dataset[1000:]
+test_set = Variable(torch.from_numpy(test_set))
+
 for i in range(10):
-    print data.masked_select(data==i).size()
+    print dataset[dataset==i].size
 
 print 'Length: %i'%len(dataset)
 
@@ -85,11 +90,11 @@ def criterion(x, x_pred,  z_mu, z_logvar):
 vae = VAE(n_x, n_z)
 optimizer = optim.Adam(vae.parameters(), lr=lr)
 
-z = Variable(torch.zeros(10,100).normal_())
+z = Variable(torch.zeros(5000,100).normal_())
 
 for e in range(n_epochs):
-    for data in data_loader:
-        x = Variable(data)
+    for i in range(0, len(train_set), batch_size):
+        x = Variable(torch.from_numpy(train_set[i:i+batch_size]))
         optimizer.zero_grad()
 
         x_pred, z_mu, z_logvar = vae(x)
@@ -97,13 +102,10 @@ for e in range(n_epochs):
         loss.backward()
         optimizer.step()
 
-    print loss.data[0], log_px.data[0], kl.data[0]
-
     _, x_pred  = vae.decode(z).max(2)
-    print x_pred.sum(1).data.numpy().squeeze()
-    print examples.sum(1).numpy().squeeze()
+    vis.histogram(x_pred.sum(1).data.numpy().squeeze(), win=0, opts=opts)
 
-    x_pred, z_mu, z_logvar = vae(Variable(examples))
+    x_pred, z_mu, z_logvar = vae(test_set)
     _, x_pred = x_pred.max(2)
-    print examples.numpy()
-    print x_pred.data.numpy().squeeze()
+    vis.histogram(x_pred.sum(1).data.numpy().squeeze(), win=1, opts=opts)
+    print 'lowerbound: %.2f, L1 error: %.2f'%(loss.data[0], (test_set.float()-x_pred.float()).abs().sum(1).mean().data[0])
