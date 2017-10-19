@@ -10,22 +10,27 @@ from torchvision import datasets, transforms
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
+from torch.autograd import grad
 import scipy.misc
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
 from elastic_deform import elastic_deform, ElasticDeformCached
 
-from models import VAE
+from models import Generator, Discriminator
 
 resolutions = [32,64,128,256,512]
 
-parser = argparse.ArgumentParser(description='Train VAE on MILA-8')
+parser = argparse.ArgumentParser(description='Train GAN on MILA-8')
 parser.add_argument('--datadir', help='path to image folder')
 parser.add_argument('--iterations', default=100000, type=int, help='iterations')
-parser.add_argument('--batch_size', default=64, type=int, help='minibatch size')
+parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient penalty')
+parser.add_argument('--double-sided', default=0, type=int, help='use double sided penalty vs single sided')
+parser.add_argument('--batch-size', default=64, type=int, help='minibatch size')
 parser.add_argument('--resolution', required=True, type=int, help='|'.join(map(str, resolutions)))
+parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
+parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
 parser.add_argument('--batchnorm', default=1, type=int, help='whether to use batchnorm')
 parser.add_argument('--latent', default=64, type=int, help='latent dimensions')
-parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
+parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
 parser.add_argument('--threads', default=8, type=int, help='number of threads for data loading')
 parser.add_argument('--logdir', required=True, help='where to log samples and models')
 parser.add_argument('--save-samples', default=100, type=int, help='save samples every')
@@ -38,15 +43,14 @@ parser.add_argument('--deform-alpha', default=8000., type=float, help='random de
 parser.add_argument('--deform-sigma', default=70, type=int, help='random deformation bandwidth')
 parser.add_argument('--deform-cache', default=1000, type=int, help='random deformation cache')
 parser.add_argument('--deform-reuse', default=32, type=int, help='how many times to reuse each deformation')
-parser.add_argument('--validation', default=0.1, type=float, help='fraction of validation set')
-parser.add_argument('--validate-every', default=20, type=int, help='validate every N iterations')
 parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
+parser.add_argument('--validation', default=0.1, type=float, help='fraction of validation set')
 
 args = parser.parse_args()
 print args
 assert args.resolution in resolutions
 date = time.strftime('%Y-%m-%d.%H%M')
-run_dir = '{}/vae-{}-{}-{}'.format(args.logdir, args.resolution, args.latent, date)
+run_dir = '{}/gan-{}-{}-{}'.format(args.logdir, args.resolution, args.latent, date)
 # Create models dir if deosnt exist
 models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
@@ -61,6 +65,43 @@ if args.deform_cache and args.deform:
                                                 alpha,
                                                 sigma,
                                                 args.deform_cache)
+
+def get_gradient_penalty(netD, real_data, fake_data, double_sided, cuda):
+    global gradients  # for debugging
+
+    batch_size = real_data.size()[0]
+    real_flat = real_data.view((batch_size, -1))
+    fake_flat = fake_data.view((batch_size, -1))
+
+    alpha = torch.rand(batch_size, 1)
+    alpha = alpha.expand(real_flat.size())  # broadcast over features
+    if cuda:
+        alpha = alpha.cuda()
+
+    interpolates_flat = alpha*real_flat + (1-alpha)*fake_flat
+    interpolates_flat = Variable(interpolates_flat, requires_grad=True)
+    interpolates = interpolates_flat.view(*real_data.size())
+
+    D_interpolates = netD(interpolates)
+
+    ones = torch.ones(D_interpolates.size())
+    zeros = torch.zeros(batch_size)
+    if cuda:
+        ones = ones.cuda()
+        zeros = zeros.cuda()
+
+    gradients = grad(outputs=D_interpolates, inputs=interpolates_flat,
+                              grad_outputs=ones,
+                              create_graph=True, retain_graph=True, only_inputs=True)[0]
+
+    if double_sided:
+        gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    else:
+        gradient_penalty, __ = torch.max((gradients*gradients).sum(1)-1, 0)
+        gradient_penalty = gradient_penalty.mean()
+
+    return gradient_penalty
+
 
 # Create deformation cache
 def make_gray(data):
@@ -131,88 +172,105 @@ recompute_cache_every = max(1, recompute_cache_every)
 print 'Will recompute cache every {} iterations'.format(recompute_cache_every)
 
 # Prepare models
-vae = VAE(args.latent, args.resolution, args.batchnorm)
+netD = Discriminator(args.latent, args.resolution, args.batchnorm)
+netG = Generator(args.latent, args.resolution, args.batchnorm)
 if args.cuda:
-    vae = vae.cuda()
-print vae
+    netD = netD.cuda()
+    netG = netG.cuda()
+print 'Discriminator', netD
+print 'Generator', netG
 
 # Optimizer
-optimizer = Adam(vae.parameters(), lr=args.lr, betas=(0.5, 0.9))
+optimizerD = Adam(netD.parameters(), lr=args.dlr, betas=(0.5, 0.9))
+optimizerG = Adam(netG.parameters(), lr=args.glr, betas=(0.5, 0.9))
 
 # Log
 log = SummaryWriter(run_dir)
 print 'Writing logs to {}'.format(run_dir)
 
-def get_loss(data, r_data, mu, logvar):
-    KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) / data.size()[0]
-    MSE = 0.5 / args.sigma * torch.sum((r_data - data)**2) / data.size()[0]
-    loss = KLD + MSE
-    return KLD, MSE, loss
 
-# Actual training
-losses = []
+######################
+# Main loop
+######################
 for iteration in tqdm(xrange(args.iterations)):
-    data, label = train_iter.next()
-    if args.cuda:
-        data = data.cuda()
-    data = Variable(data)
+    start_time = time.time()
 
-    # Compute
-    r_data, mu, logvar = vae(data)
+    ############################
+    # (1) Update D network
+    ###########################
 
-    # Loss
-    KLD, MSE, loss = get_loss(data, r_data, mu, logvar)
+    # Require gradient for netD
+    for p in netD.parameters():  # reset requires_grad
+        p.requires_grad = True  # they are set to False below in netG update
 
-    # Backprop
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-
-    # Log
-    losses.append(loss.data[0])
-    if iteration % args.log_every == 0:
-        print 'Loss', losses[-1]
-        print 'KL', KLD.data[0]
-        print 'MSE', MSE.data[0]
-    log.add_scalar('loss_TRAIN', loss.data[0], iteration)
-    log.add_scalar('KL_TRAIN', KLD.data[0], iteration)
-    log.add_scalar('MSE_TRAIN', MSE.data[0], iteration)
-
-    # Reconstructions
-    if iteration % args.save_samples == 0:
-        # Reconstruct
-        gallery_rec = torchvision.utils.make_grid(r_data.data, normalize=True, range=(0,1))
-        gallery_train = torchvision.utils.make_grid(data.data, normalize=True, range=(0,1))
-        log.add_image('train', gallery_train, iteration)
-        log.add_image('reconstruction', gallery_rec, iteration)
-        # Generate 100 images
-        samples = vae.generate(args.generate_samples, use_cuda=args.cuda)
-        gallery_gen = torchvision.utils.make_grid(samples.data, normalize=True, range=(0,1))
-        log.add_image('generation', gallery_gen, iteration)
-
-    # Models
-    if iteration % args.save_models == 0:
-        fname = '{}/vae-{}.torch'.format(models_dir, iteration)
-        print 'Saving models', fname
-        torch.save(vae, fname)
-
-    # Evaluate
-    if iteration % args.validate_every == 0:
-        data, label = test_iter.next()
+    for iter_d in xrange(args.critic_iterations):
+        # Real data
+        real_data, __ = train_iter.next()
         if args.cuda:
-            data = data.cuda()
-        data = Variable(data)
-        r_data, mu, logvar = vae(data)
-        KLD, MSE, loss = get_loss(data, r_data, mu, logvar)
-        log.add_scalar('loss_VAL', loss.data[0], iteration)
-        log.add_scalar('KL_VAL', KLD.data[0], iteration)
-        log.add_scalar('MSE_VAL', MSE.data[0], iteration)
+            real_data = real_data.cuda()
+        real_data = Variable(real_data)
+        if len(real_data) != args.batch_size:
+            # the last batch might be smaller, skip it
+            continue
+        D_real = netD(real_data).mean()
 
-    # Recompute deformation cache
-    if (args.deform
-            and args.deform_cache
-            and iteration % recompute_cache_every == 0):
-        print '*'*32
-        print 'Recomputing cache!'
-        print '*'*32
-        elastic_deform_cached.recompute()
+        # Fake data
+        # volatile: do not compute gradient for netG
+        # stop gradient at fake_data
+        fake_data = Variable(netG.generate(args.batch_size, volatile=True, use_cuda=args.cuda).data)
+        D_fake = netD(fake_data).mean()
+
+        # Costs
+        gradient_penalty = args.penalty * get_gradient_penalty(
+            netD, real_data.data, fake_data.data, double_sided=args.double_sided, cuda=args.cuda)
+        D_cost = D_fake - D_real + gradient_penalty
+        Wasserstein_D = D_real - D_fake
+
+        # Train D but not G
+        netD.zero_grad()
+        D_cost.backward()
+        optimizerD.step()
+
+    ############################
+    # (2) Update G network
+    ###########################
+
+    # Do not compute gradient for netD
+    for p in netD.parameters():
+        p.requires_grad = False  # to avoid computation
+
+    # Generate fake data
+    # volatile: compute gradients for netG
+    fake_data = netG.generate(args.batch_size, volatile=False, use_cuda=args.cuda)
+    D_fake = netD(fake_data).mean()
+
+    # Costs
+    G_cost = -D_fake
+
+    # Train G but not D
+    netG.zero_grad()
+    G_cost.backward()
+    optimizerG.step()
+
+    # Write logs and save samples
+    log.add_scalar('timePerIteration', time.time()-start_time, iteration)
+    log.add_scalar('discriminatorCost', D_cost.cpu().data.numpy(), iteration)
+    log.add_scalar('generatorCost', G_cost.cpu().data.numpy(), iteration)
+    log.add_scalar('wasserstein', Wasserstein_D.cpu().data.numpy(), iteration)
+    log.add_scalar('gradientPenalty', gradient_penalty.cpu().data.numpy(), iteration)
+
+
+    # Export samples to tensorboard
+    if iteration % args.save_samples == 0:
+        gallery_train = torchvision.utils.make_grid(real_data.data, normalize=True, range=(0,1))
+        gallery_gen = torchvision.utils.make_grid(fake_data.data, normalize=True, range=(0,1))
+        log.add_image('train', gallery_train, iteration)
+        log.add_image('generation', gallery_gen, iteration)
+        print 'Saving samples to tensorboard'
+
+    # Save models
+    if iteration % args.save_models == 0:
+        frame_str = '{:08d}'.format(iteration)
+        print 'Saving models'
+        torch.save(netD, '{}/discriminator_{}.torch'.format(models_dir, iteration))
+        torch.save(netG, '{}/generator_{}.torch'.format(models_dir, iteration))
