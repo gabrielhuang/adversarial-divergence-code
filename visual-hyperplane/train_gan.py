@@ -122,6 +122,7 @@ class DigitGenerator(nn.Module):
         out = F.relu(self.dense1(input))
         out = F.relu(self.dense2(out))
         out = self.dense3(out)
+        out = F.softmax(out)
         return out.view(-1, NB_DIGITS, DIM)
 
     def generate(self, batch_size, volatile=True):
