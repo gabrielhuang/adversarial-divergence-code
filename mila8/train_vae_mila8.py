@@ -18,7 +18,7 @@ from models import VAE
 
 resolutions = [32,64,128,256,512]
 
-parser = argparse.ArgumentParser(description='Compute scattering transform of a given dataset.\nThe resulting tensor will have size (M_pad/2^J, M_pad/2^J, 1 + JL + L^2 J(J-1)/2')
+parser = argparse.ArgumentParser(description='Train VAE on MILA-8')
 parser.add_argument('--datadir', help='path to image folder')
 parser.add_argument('--iterations', default=100000, type=int, help='iterations')
 parser.add_argument('--batch_size', default=64, type=int, help='minibatch size')
