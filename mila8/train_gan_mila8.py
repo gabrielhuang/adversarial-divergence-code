@@ -10,11 +10,12 @@ from torchvision import datasets, transforms
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
+from torch.autograd import grad
 import scipy.misc
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
 from elastic_deform import elastic_deform, ElasticDeformCached
 
-import vae_mila8
+from models import Generator, Discriminator
 
 resolutions = [32,64,128,256,512]
 
@@ -22,13 +23,13 @@ parser = argparse.ArgumentParser(description='Train GAN on MILA-8')
 parser.add_argument('--datadir', help='path to image folder')
 parser.add_argument('--iterations', default=100000, type=int, help='iterations')
 parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient penalty')
-parser.add_argument('--batch_size', default=64, type=int, help='minibatch size')
+parser.add_argument('--double-sided', default=0, type=int, help='use double sided penalty vs single sided')
+parser.add_argument('--batch-size', default=64, type=int, help='minibatch size')
 parser.add_argument('--resolution', required=True, type=int, help='|'.join(map(str, resolutions)))
 parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
 parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
 parser.add_argument('--batchnorm', default=1, type=int, help='whether to use batchnorm')
 parser.add_argument('--latent', default=64, type=int, help='latent dimensions')
-parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
 parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
 parser.add_argument('--threads', default=8, type=int, help='number of threads for data loading')
 parser.add_argument('--logdir', required=True, help='where to log samples and models')
@@ -43,6 +44,7 @@ parser.add_argument('--deform-sigma', default=70, type=int, help='random deforma
 parser.add_argument('--deform-cache', default=1000, type=int, help='random deformation cache')
 parser.add_argument('--deform-reuse', default=32, type=int, help='how many times to reuse each deformation')
 parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
+parser.add_argument('--validation', default=0.1, type=float, help='fraction of validation set')
 
 args = parser.parse_args()
 print args
@@ -64,8 +66,7 @@ if args.deform_cache and args.deform:
                                                 sigma,
                                                 args.deform_cache)
 
-ZEROS = Variable(torch.zeros((args.batch_size)).cuda())
-def get_gradient_penalty(netD, real_data, fake_data, double_sided=False):
+def get_gradient_penalty(netD, real_data, fake_data, double_sided, cuda):
     global gradients  # for debugging
 
     batch_size = real_data.size()[0]
@@ -74,7 +75,8 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided=False):
 
     alpha = torch.rand(batch_size, 1)
     alpha = alpha.expand(real_flat.size())  # broadcast over features
-    alpha = alpha.cuda()
+    if cuda:
+        alpha = alpha.cuda()
 
     interpolates_flat = alpha*real_flat + (1-alpha)*fake_flat
     interpolates_flat = Variable(interpolates_flat, requires_grad=True)
@@ -82,14 +84,21 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided=False):
 
     D_interpolates = netD(interpolates)
 
+    ones = torch.ones(D_interpolates.size())
+    zeros = torch.zeros(batch_size)
+    if cuda:
+        ones = ones.cuda()
+        zeros = zeros.cuda()
+
     gradients = grad(outputs=D_interpolates, inputs=interpolates_flat,
-                              grad_outputs=torch.ones(D_interpolates.size()).cuda(),
+                              grad_outputs=ones,
                               create_graph=True, retain_graph=True, only_inputs=True)[0]
 
     if double_sided:
         gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     else:
-        gradient_penalty = torch.max((gradients*gradients).sum(1)-1, ZEROS).mean()
+        gradient_penalty, __ = torch.max((gradients*gradients).sum(1)-1, 0)
+        gradient_penalty = gradient_penalty.mean()
 
     return gradient_penalty
 
@@ -196,7 +205,10 @@ for iteration in tqdm(xrange(args.iterations)):
 
     for iter_d in xrange(args.critic_iterations):
         # Real data
-        real_data = Variable(torch.Tensor(data_iter.next()).cuda())
+        real_data, __ = train_iter.next()
+        if args.cuda:
+            real_data = real_data.cuda()
+        real_data = Variable(real_data)
         if len(real_data) != args.batch_size:
             # the last batch might be smaller, skip it
             continue
@@ -205,12 +217,12 @@ for iteration in tqdm(xrange(args.iterations)):
         # Fake data
         # volatile: do not compute gradient for netG
         # stop gradient at fake_data
-        fake_data = Variable(netG.generate(args.batch_size, volatile=True, cuda=args.cuda).data)
+        fake_data = Variable(netG.generate(args.batch_size, volatile=True, use_cuda=args.cuda).data)
         D_fake = netD(fake_data).mean()
 
         # Costs
         gradient_penalty = args.penalty * get_gradient_penalty(
-            netD, real_data.data, fake_data.data, double_sided=args.double_sided)
+            netD, real_data.data, fake_data.data, double_sided=args.double_sided, cuda=args.cuda)
         D_cost = D_fake - D_real + gradient_penalty
         Wasserstein_D = D_real - D_fake
 
@@ -229,7 +241,7 @@ for iteration in tqdm(xrange(args.iterations)):
 
     # Generate fake data
     # volatile: compute gradients for netG
-    fake_data = netG.generate(args.batch_size, volatile=False)
+    fake_data = netG.generate(args.batch_size, volatile=False, use_cuda=args.cuda)
     D_fake = netD(fake_data).mean()
 
     # Costs
@@ -254,7 +266,7 @@ for iteration in tqdm(xrange(args.iterations)):
         gallery_gen = torchvision.utils.make_grid(fake_data.data, normalize=True, range=(0,1))
         log.add_image('train', gallery_train, iteration)
         log.add_image('generation', gallery_gen, iteration)
-        print 'Saving samples to {}'.format(filename)
+        print 'Saving samples to tensorboard'
 
     # Save models
     if iteration % args.save_models == 0:
