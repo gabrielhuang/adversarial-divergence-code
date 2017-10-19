@@ -45,13 +45,12 @@ class HyperplaneCachedDataset(Dataset):
 
 
 if __name__ == '__main__':
-    dataset = HyperplaneCachedDataset(3, range(10), 3)
+    dataset = HyperplaneCachedDataset(3, range(10), 3, one_hot=True)
     data_loader = DataLoader(dataset, batch_size=5, shuffle=True)
     print 'Length', len(dataset)
     print 'Example', dataset[0]
     print 'Example batch'
     for data in data_loader:
         # This would be the main training loop
-        print data
+        print data.shape
         break
-
