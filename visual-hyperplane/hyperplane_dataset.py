@@ -30,7 +30,9 @@ class HyperplaneCachedDataset(Dataset):
     def __getitem__(self, idx):
         c = self.combinations[idx]
         if self.one_hot:
-            raise Exception('Not implemented, and probably not needed')
+            oh = np.zeros((self.n_coins, len(self.coins)))
+            oh[np.arange(self.n_coins),c] = 1
+            return torch.Tensor(oh)
         else:
             if self.use_float:
                 return torch.Tensor(c)
@@ -38,13 +40,12 @@ class HyperplaneCachedDataset(Dataset):
                 return torch.LongTensor(c)
 
 if __name__ == '__main__':
-    dataset = HyperplaneCachedDataset(3, range(10), 3)
+    dataset = HyperplaneCachedDataset(3, range(10), 3, one_hot=True)
     data_loader = DataLoader(dataset, batch_size=5, shuffle=True)
     print 'Length', len(dataset)
     print 'Example', dataset[0]
     print 'Example batch'
     for data in data_loader:
         # This would be the main training loop
-        print data
+        print data.shape
         break
-
