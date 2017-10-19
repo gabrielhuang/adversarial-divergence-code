@@ -14,8 +14,8 @@ parser.add_argument('--batch-size', default=64, type=int, help='minibatch batch 
 parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
 parser.add_argument('--model', default='gan')
 parser.add_argument('--logdir', required=True, help='where to log samples and models')
-parser.add_argument('--double-sided', action='store_true', help='whether to use double-sided penalty')
-parser.add_argument('--save-samples', default=100, type=int, help='save samples every N iterations')
+parser.add_argument('--double-sided', default=True, action='store_true', help='whether to use double-sided penalty')
+parser.add_argument('--save-samples', default=500, type=int, help='save samples every N iterations')
 parser.add_argument('--save-models', default=5000, type=int, help='save models every N iterations')
 parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
 parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
@@ -54,8 +54,8 @@ from hyperplane_dataset import  HyperplaneCachedDataset
 ######################
 # Constant
 ######################
-AMOUNT = 3
-NB_DIGITS = 3
+AMOUNT = 25
+NB_DIGITS = 5
 DIM = 10
 
 
@@ -77,7 +77,7 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided=True):
 
     alpha = torch.rand(batch_size, 1)
     alpha = alpha.expand(real_flat.size())  # broadcast over features
-    if args.cuda:
+    if args.use_cuda:
         alpha = alpha.cuda()
 
     interpolates_flat = alpha*real_flat + (1-alpha)*fake_flat
@@ -171,7 +171,7 @@ optimizerG = Adam(netG.parameters(), lr=args.glr, betas=(0.5, 0.9))
 ######################
 # Load data
 ######################
-dataset = HyperplaneCachedDataset(AMOUNT, range(DIM), NB_DIGITS)
+dataset = HyperplaneCachedDataset(AMOUNT, range(DIM), NB_DIGITS, one_hot=True)
 data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
 
@@ -250,7 +250,7 @@ for iteration in tqdm(xrange(args.iterations)):
 
     # Generate fake data
     # volatile: compute gradients for netG
-    fake_data = Variable(netG.generate(args.batch_size, volatile=False).data)
+    fake_data = netG.generate(args.batch_size, volatile=False)
     D_fake = netD(fake_data).mean()
 
     # Costs
@@ -270,9 +270,14 @@ for iteration in tqdm(xrange(args.iterations)):
 
     # Calculate dev loss and generate samples every 100 iters
     if iteration % args.save_samples == 0:
-        filename = '{}/ft_{}.torch'.format(samples_dir, iteration)
+        filename = '{}/softmax_{}.npy'.format(samples_dir, iteration)
         samples = netG.generate(100)  # by default generate 100 samples
-        torch.save(samples.data.cpu().numpy(), filename)
+        samples = samples.data.cpu().numpy()
+
+        np.save(filename, samples)
+        filename = '{}/digits_{}.npy'.format(samples_dir, iteration)
+        digits = np.argmax(samples, axis=-1)
+        np.save(filename, digits)
         print 'Saving samples to {}'.format(filename)
 
     if iteration % args.save_models == 0:
