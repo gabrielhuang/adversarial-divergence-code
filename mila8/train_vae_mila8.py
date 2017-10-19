@@ -14,7 +14,7 @@ import scipy.misc
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
 from elastic_deform import elastic_deform, ElasticDeformCached
 
-import vae_mila8
+from models import VAE
 
 resolutions = [32,64,128,256,512]
 
@@ -131,7 +131,7 @@ recompute_cache_every = max(1, recompute_cache_every)
 print 'Will recompute cache every {} iterations'.format(recompute_cache_every)
 
 # Prepare models
-vae = vae_mila8.VAE(args.latent, args.resolution, args.batchnorm)
+vae = VAE(args.latent, args.resolution, args.batchnorm)
 if args.cuda:
     vae = vae.cuda()
 print vae

@@ -34,7 +34,6 @@ examples = dataiter.next()[:10]
 data = dataset[:]
 for i in range(10):
     print data.masked_select(data==i).size()
-exit()
 
 print 'Length: %i'%len(dataset)
 
