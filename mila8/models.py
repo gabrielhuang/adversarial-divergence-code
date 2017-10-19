@@ -116,7 +116,9 @@ class VAE(nn.Module):
         self.decoder_modules = build_cnn(self.decoder_sizes,
                                  batchnorm=batchnorm,
                                  deconv=True)
-        self.decoder_modules += [nn.ReLU()]
+        # ReLU is better than Sigmoid because data contains mostly 0
+        # so everything will be centered but positive
+        self.decoder_modules += [nn.ReLU(True)]
         self.decoder = nn.Sequential(*self.decoder_modules)
 
     def encode(self, x):
@@ -140,9 +142,6 @@ class VAE(nn.Module):
         return self.decode(z), mu, logvar
 
     def generate(self, batch_size=100, noise=None, volatile=False, use_cuda=True):
-        '''
-        n is either integer or latent variable
-        '''
         if noise is None:
             noise = torch.randn(batch_size, self.latent, 1, 1)
             if use_cuda:
@@ -150,3 +149,58 @@ class VAE(nn.Module):
             noise = Variable(noise, volatile=volatile)
         samples = self.decode(noise)
         return samples
+
+
+class Generator(nn.Module):
+
+    def __init__(self, latent, resolution, batchnorm=True):
+        nn.Module.__init__(self)
+        self.latent = latent
+        self.resolution = resolution
+        self.batchnorm = batchnorm
+
+        __ , self.generator_sizes  = get_sizes(latent, resolution)
+
+        self.modules = build_cnn(self.generator_sizes,
+                              batchnorm,
+                              deconv=True)
+        self.modules += [nn.ReLU(True)]
+
+        self.main = nn.Sequential(*self.modules)
+
+    def forward(self, input):
+        out = self.main(input)
+        return out
+
+    def generate(self, batch_size=100, noise=None, volatile=False, use_cuda=True):
+        if noise is None:
+            noise = torch.randn(batch_size, self.latent, 1, 1)
+            if use_cuda:
+                noise = noise.cuda()
+            noise = Variable(noise, volatile=volatile)
+        samples = self(noise)
+        return samples
+
+
+class DigitDiscriminator(nn.Module):
+
+    def __init__(self, latent, resolution, batchnorm=True):
+        nn.Module.__init__(self)
+        self.latent = latent
+        self.resolution = resolution
+        self.batchnorm = batchnorm
+
+        self.discriminator_sizes, __ = get_sizes(latent, resolution)
+
+        self.modules = build_cnn(self.discriminator_sizes,
+                              batchnorm,
+                              deconv=False)
+        self.modules += [nn.ReLU(True)]
+        self.modules += [nn.Conv2d(self.discriminator_sizes[-1][0], 1, 1, 1, 0)]
+
+        self.main = nn.Sequential(*self.modules)
+
+    def forward(self, input):
+        out = self.main(input)
+        return out.view(-1, 1)  # scalar output
+
