@@ -182,7 +182,7 @@ class Generator(nn.Module):
         return samples
 
 
-class DigitDiscriminator(nn.Module):
+class Discriminator(nn.Module):
 
     def __init__(self, latent, resolution, batchnorm=True):
         nn.Module.__init__(self)
