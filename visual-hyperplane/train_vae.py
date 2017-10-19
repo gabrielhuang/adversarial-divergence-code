@@ -60,7 +60,7 @@ class VAE(nn.Module):
         return z_mu, z_logvar
 
     def reparametrize(self, mu, logvar):
-        eps = Variable(mu.data.normal_())
+        eps = Variable(mu.data.new(mu.size()).normal_())
         return mu + 0.5*logvar.exp()*eps
 
     def decode(self, z):
