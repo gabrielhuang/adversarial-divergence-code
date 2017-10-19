@@ -215,6 +215,7 @@ for iteration in tqdm(xrange(args.iterations)):
     for iter_d in xrange(args.critic_iterations):
         # Real data
         real_data = torch.Tensor(data_iter.next())
+        real_data = real_data + 0.1 * torch.rand(real_data.size())
         if args.use_cuda:
             real_data = real_data.cuda()
         real_data = Variable(real_data)
