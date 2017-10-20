@@ -49,7 +49,7 @@ import torch.nn.functional as F
 import numpy as np
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
-from hyperplane_dataset import  HyperplaneCachedDataset
+from hyperplane_dataset import generate_hyperplane_dataset
 
 
 ######################
@@ -214,7 +214,7 @@ optimizerG = Adam(netG.parameters(), lr=args.glr, betas=(0.5, 0.9))
 ######################
 # Load data
 ######################
-dataset = HyperplaneCachedDataset(AMOUNT, range(DIM), NB_DIGITS, one_hot=True)
+dataset = generate_hyperplane_dataset(AMOUNT, range(DIM), NB_DIGITS, True)
 data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
 
@@ -261,8 +261,8 @@ for iteration in tqdm(xrange(args.iterations)):
 
     for iter_d in xrange(args.critic_iterations):
         # Real data
-        real_data = torch.Tensor(data_iter.next())
-        real_data = real_data + 0.1 * torch.rand(real_data.size())
+        real_data = data_iter.next()
+        # real_data = real_data + 0.1 * torch.rand(real_data.size())
         if args.use_cuda:
             real_data = real_data.cuda()
         real_data = Variable(real_data)
