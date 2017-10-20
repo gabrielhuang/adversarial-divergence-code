@@ -7,7 +7,7 @@ import time
 
 
 parser = argparse.ArgumentParser(description='Train a GAN on digits')
-parser.add_argument('-l', '--latent', default=100, type=int, help='number of latent dimensions')
+parser.add_argument('-l', '--latent', default=10, type=int, help='number of latent dimensions')
 parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient penalty')
 parser.add_argument('-i', '--iterations', default=200000, type=int, help='number of iterations')
 parser.add_argument('--batch-size', default=64, type=int, help='minibatch batch size')
@@ -97,8 +97,9 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided=True):
     if double_sided:
         gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     else:
-        gradient_penalty = torch.max((gradients*gradients).sum(1)-1, ZEROS).mean()
-
+        gradient_penalty, __ = torch.max((gradients*gradients).sum(1)-1, 0)
+        gradient_penalty = gradient_penalty.mean()
+        
     return gradient_penalty
 
 
@@ -112,14 +113,23 @@ class DigitGenerator(nn.Module):
         nn.Module.__init__(self)
         self.latent = latent
         N = NB_DIGITS * DIM
-        self.dense1 = nn.Linear(latent, 128)
-        self.dense2 = nn.Linear(128, 64)
-        self.dense3 = nn.Linear(64, N)
-
+        self.main = nn.Sequential([
+            # latent channels
+            nn.Linear(latent, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(True),
+            # 128 channels
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(True),
+            # 64 channels
+            nn.Linear(64, N),
+            nn.BatchNorm1d(N)
+            # NB_DIGITS*DIM channels
+        ])
+        
     def forward(self, input):
-        out = F.relu(self.dense1(input))
-        out = F.relu(self.dense2(out))
-        out = self.dense3(out)
+        out = self.main(input)
         out = out.view(-1, DIM)
         out = F.softmax(out)
         return out.view(-1, NB_DIGITS, DIM)
