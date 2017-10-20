@@ -20,6 +20,7 @@ parser.add_argument('--save-models', default=5000, type=int, help='save models e
 parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
 parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
 parser.add_argument('--use-cuda', default=False, type=bool, help='whether to use cuda')
+parser.add_argument('--use-gumbel', default=False, type=bool, help='whether to use Gumbel reparametrization')
 
 args = parser.parse_args()
 date = time.strftime('%Y-%m-%d.%H%M')
@@ -58,6 +59,23 @@ AMOUNT = 25
 NB_DIGITS = 5
 DIM = 10
 
+INIT_TEMP = 1
+MIN_TEMP = 0.5
+ANNEAL_TEMP = 1e-5
+
+######################
+# gumbel-softmax
+######################
+tau = INIT_TEMP
+
+def gumbel_softmax_sampler(logits, tau):
+    noise = torch.rand(logits.size())
+    noise.add_(1e-9).log_().neg_()
+    noise.add_(1e-9).log_().neg_()
+    noise = Variable(noise)
+    x = (logits + noise) / tau
+    x = F.softmax(x.view(logits.size(0), -1))
+    return x.view_as(logits)
 
 ######################
 # Utilities
@@ -128,18 +146,24 @@ class DigitGenerator(nn.Module):
             # NB_DIGITS*DIM channels
         )
 
-    def forward(self, input):
+    def forward(self, input, tau=None):
         out = self.main(input)
-        out = out.view(-1, DIM)
-        out = F.softmax(out)
+        logits = out.view(-1, DIM)
+        if tau:
+            out = gumbel_softmax_sampler(logits, tau)
+        else:
+            out = F.softmax(out)
         return out.view(-1, NB_DIGITS, DIM)
 
-    def generate(self, batch_size, volatile=True):
+    def generate(self, batch_size, tau=None, volatile=True):
         noise = torch.randn(batch_size, self.latent)
         if args.use_cuda:
             noise = noise.cuda()
         noise = Variable(noise, volatile=volatile)
-        samples = self(noise)
+        if tau:
+            samples = self(noise, tau=tau)
+        else:
+            samples = self(noise)
         return samples
 
 
@@ -221,6 +245,10 @@ log.add_text('args', str(args), 0)
 for iteration in tqdm(xrange(args.iterations)):
     start_time = time.time()
 
+    # annealing temperation
+    if iteration % 1000 == 0:
+        tau = np.maximum(INIT_TEMP * np.exp(-ANNEAL_TEMP * iteration), MIN_TEMP)
+
     ############################
     # (1) Update D network
     ###########################
@@ -244,7 +272,11 @@ for iteration in tqdm(xrange(args.iterations)):
         # Fake data
         # volatile: do not compute gradient for netG
         # stop gradient at fake_data
-        fake_data = Variable(netG.generate(args.batch_size, volatile=True).data)
+        if args.use_gumbel:
+            fake_data = Variable(netG.generate(args.batch_size, tau=tau, volatile=True).data)
+        else:
+            fake_data = Variable(netG.generate(args.batch_size, volatile=True).data)
+
         D_fake = netD(fake_data).mean()
 
         # Costs
@@ -268,7 +300,11 @@ for iteration in tqdm(xrange(args.iterations)):
 
     # Generate fake data
     # volatile: compute gradients for netG
-    fake_data = netG.generate(args.batch_size, volatile=False)
+    if args.use_gumbel:
+        fake_data = netG.generate(args.batch_size, tau=tau, volatile=False)
+    else:
+        fake_data = netG.generate(args.batch_size, volatile=False)
+
     D_fake = netD(fake_data).mean()
 
     # Costs
@@ -295,7 +331,10 @@ for iteration in tqdm(xrange(args.iterations)):
     # Calculate dev loss and generate samples every 100 iters
     if iteration % args.save_samples == 0:
         filename = '{}/softmax_{}.npy'.format(samples_dir, iteration)
-        samples = netG.generate(100)  # by default generate 100 samples
+        if args.use_gumbel:
+            samples = netG.generate(100, tau=tau)  # by default generate 100 samples
+        else:
+            samples = netG.generate(100, tau=tau)
         samples = samples.data.cpu().numpy()
 
         np.save(filename, samples)
