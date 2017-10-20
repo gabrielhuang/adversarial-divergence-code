@@ -113,7 +113,7 @@ class DigitGenerator(nn.Module):
         nn.Module.__init__(self)
         self.latent = latent
         N = NB_DIGITS * DIM
-        self.main = nn.Sequential([
+        self.main = nn.Sequential(
             # latent channels
             nn.Linear(latent, 128),
             nn.BatchNorm1d(128),
@@ -126,7 +126,7 @@ class DigitGenerator(nn.Module):
             nn.Linear(64, N),
             nn.BatchNorm1d(N)
             # NB_DIGITS*DIM channels
-        ])
+        )
         
     def forward(self, input):
         out = self.main(input)
