@@ -63,14 +63,17 @@ class HyperplaneWithLookup(Dataset):
             c = tuple(data[0].numpy().argmax(axis=1))
         else:
             c = tuple(data[0].numpy())
+        print c
         return c in self.set
 
 
-def get_full_train_test(amount, coins, n_coins, one_hot, validation=0.8):
+def get_full_train_test(amount, coins, n_coins, one_hot, validation=0.8, seed=None):
     # Get main dataset
     full_dataset = generate_hyperplane_dataset(amount, coins, n_coins, one_hot)
 
     # Shuffle and split
+    if seed is not None:
+        np.random.seed(seed)
     np.random.shuffle(full_dataset.combinations)
     train_end = int(validation * len(full_dataset))
     train_dataset = HyperplaneDataset(full_dataset.combinations[:train_end], coins, one_hot)
@@ -86,7 +89,7 @@ def get_full_train_test(amount, coins, n_coins, one_hot, validation=0.8):
 
 if __name__ == '__main__':
     # Generate full dataset, train and test splits
-    full, train, test = get_full_train_test(4, range(4), 3, one_hot=True)
+    full, train, test = get_full_train_test(4, range(4), 3, one_hot=True, seed=0)
     print 'Length Full', len(full)
     print 'Length Train', len(train)
     print 'Length Test', len(test)
@@ -100,8 +103,8 @@ if __name__ == '__main__':
     for data in data_loader:
         # This would be the main training loop
         print 'Training batch'
-        print 'Is training example in training?', tuple(data[0]) in train
-        print 'Is training example in test?', tuple(data[0]) in test
+        print 'Is training example in training?', data[0] in train
+        print 'Is training example in test?', data[0] in test
         print
         print "Now here's an example batch"
         print 'You might need to cast to torch.Tensor from torch.LongTensor'
