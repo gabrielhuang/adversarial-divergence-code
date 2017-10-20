@@ -60,10 +60,9 @@ class HyperplaneWithLookup(Dataset):
         one can test whether c is in the dataset
         '''
         if self.hyperplane_dataset.one_hot:
-            c = tuple(data[0].numpy().argmax(axis=1))
+            c = tuple(c.numpy().argmax(axis=1))
         else:
-            c = tuple(data[0].numpy())
-        print c
+            c = tuple(c.numpy())
         return c in self.set
 
 
@@ -98,13 +97,17 @@ if __name__ == '__main__':
     print 'Train', train[:]
     print 'Test', test[:]
 
+    print 'Is training example in training?', train[0] in train
+    print 'Is training example in test?', train[0] in test
+    print 'Is test example in training?', test[0] in train
+    print 'Is test example in test?', test[0] in test
+
+
     # Try dataloader
     data_loader = DataLoader(train, batch_size=5, shuffle=True)
     for data in data_loader:
         # This would be the main training loop
         print 'Training batch'
-        print 'Is training example in training?', data[0] in train
-        print 'Is training example in test?', data[0] in test
         print
         print "Now here's an example batch"
         print 'You might need to cast to torch.Tensor from torch.LongTensor'
