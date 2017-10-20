@@ -97,8 +97,9 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided=True):
     if double_sided:
         gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     else:
-        gradient_penalty = torch.max((gradients*gradients).sum(1)-1, ZEROS).mean()
-
+        gradient_penalty, __ = torch.max((gradients*gradients).sum(1)-1, 0)
+        gradient_penalty = gradient_penalty.mean()
+        
     return gradient_penalty
 
 
