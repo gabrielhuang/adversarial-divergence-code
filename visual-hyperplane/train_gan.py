@@ -70,6 +70,8 @@ tau = INIT_TEMP
 
 def gumbel_softmax_sampler(logits, tau):
     noise = torch.rand(logits.size())
+    if args.use_cuda:
+        noise = noise.cuda()
     noise.add_(1e-9).log_().neg_()
     noise.add_(1e-9).log_().neg_()
     noise = Variable(noise)
