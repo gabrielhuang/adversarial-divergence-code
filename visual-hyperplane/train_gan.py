@@ -99,7 +99,7 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided=True):
     else:
         gradient_penalty, __ = torch.max((gradients*gradients).sum(1)-1, 0)
         gradient_penalty = gradient_penalty.mean()
-        
+
     return gradient_penalty
 
 
@@ -113,7 +113,7 @@ class DigitGenerator(nn.Module):
         nn.Module.__init__(self)
         self.latent = latent
         N = NB_DIGITS * DIM
-        self.main = nn.Sequential([
+        self.main = nn.Sequential(
             # latent channels
             nn.Linear(latent, 128),
             nn.BatchNorm1d(128),
@@ -126,8 +126,8 @@ class DigitGenerator(nn.Module):
             nn.Linear(64, N),
             nn.BatchNorm1d(N)
             # NB_DIGITS*DIM channels
-        ])
-        
+        )
+
     def forward(self, input):
         out = self.main(input)
         out = out.view(-1, DIM)
