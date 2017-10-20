@@ -172,7 +172,7 @@ recompute_cache_every = max(1, recompute_cache_every)
 print 'Will recompute cache every {} iterations'.format(recompute_cache_every)
 
 # Prepare models
-netD = Discriminator(args.latent, args.resolution, args.batchnorm)
+netD = Discriminator(args.latent, args.resolution, False)
 netG = Generator(args.latent, args.resolution, args.batchnorm)
 if args.cuda:
     netD = netD.cuda()
