@@ -7,7 +7,7 @@ import time
 
 
 parser = argparse.ArgumentParser(description='Train a GAN on digits')
-parser.add_argument('-l', '--latent', default=100, type=int, help='number of latent dimensions')
+parser.add_argument('-l', '--latent', default=10, type=int, help='number of latent dimensions')
 parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient penalty')
 parser.add_argument('-i', '--iterations', default=200000, type=int, help='number of iterations')
 parser.add_argument('--batch-size', default=64, type=int, help='minibatch batch size')
