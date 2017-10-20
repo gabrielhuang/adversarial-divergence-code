@@ -149,16 +149,22 @@ class DigitDiscriminator(nn.Module):
         nn.Module.__init__(self)
 
         N = NB_DIGITS * DIM
-        self.dense1 = nn.Linear(N, 128)
-        self.dense2 = nn.Linear(128, 64)
-        self.dense3 = nn.Linear(64, 1)
+        self.main = nn.Sequential(
+            # NB_DIGITS*DIM channels
+            nn.Linear(N, 128),
+            nn.ReLU(True),
+            # 128 channels
+            nn.Linear(128, 64),
+            nn.ReLU(True),
+            # 64 channels
+            nn.Linear(64, 1),
+            # 1 channel
+        )
 
     def forward(self, input):
         N = NB_DIGITS * DIM
         out = input.view(-1, N)
-        out = F.relu(self.dense1(out))
-        out = F.relu(self.dense2(out))
-        out = self.dense3(out)
+        out = self.main(out)
         return out.view(-1, 1)
 
 
