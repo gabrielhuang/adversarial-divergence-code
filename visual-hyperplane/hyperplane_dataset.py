@@ -32,9 +32,9 @@ class HyperplaneDataset(Dataset):
         c = self.combinations[idx]
         if self.one_hot:
             c_encoded = self.onehot_encoder.transform(np.asarray(c).reshape(-1, 1))
-            return torch.Tensor(c_encoded)
+            return torch.LongTensor(c_encoded.astype(int))
         else:
-            return torch.Tensor(c)
+            return torch.LongTensor(c)
 
 
 def generate_hyperplane_dataset(amount, coins, n_coins, one_hot):
