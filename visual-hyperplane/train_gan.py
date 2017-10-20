@@ -273,12 +273,18 @@ for iteration in tqdm(xrange(args.iterations)):
     G_cost.backward()
     optimizerG.step()
 
+    # compute precision
+    digits = fake_data.max(-1)[1]
+    count = (digits.sum(-1) == 25).sum().type(torch.FloatTensor)
+    precision = count / args.batch_size * 100
+
     # Write logs and save samples
     log.add_scalar('timePerIteration', time.time() - start_time, iteration)
     log.add_scalar('discriminatorCost', D_cost.cpu().data.numpy(), iteration)
     log.add_scalar('generatorCost', G_cost.cpu().data.numpy(), iteration)
     log.add_scalar('wasserstein', Wasserstein_D.cpu().data.numpy(), iteration)
     log.add_scalar('gradientPenalty', gradient_penalty.cpu().data.numpy(), iteration)
+    log.add_scalar('precision', precision.cpu().data.numpy(), iteration)
 
     # Calculate dev loss and generate samples every 100 iters
     if iteration % args.save_samples == 0:
