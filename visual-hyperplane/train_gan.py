@@ -7,7 +7,7 @@ import time
 
 
 parser = argparse.ArgumentParser(description='Train a GAN on digits')
-parser.add_argument('-l', '--latent', default=100, type=int, help='number of latent dimensions')
+parser.add_argument('-l', '--latent', default=10, type=int, help='number of latent dimensions')
 parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient penalty')
 parser.add_argument('-i', '--iterations', default=200000, type=int, help='number of iterations')
 parser.add_argument('--batch-size', default=64, type=int, help='minibatch batch size')
@@ -97,7 +97,8 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided=True):
     if double_sided:
         gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     else:
-        gradient_penalty = torch.max((gradients*gradients).sum(1)-1, ZEROS).mean()
+        gradient_penalty, __ = torch.max((gradients*gradients).sum(1)-1, 0)
+        gradient_penalty = gradient_penalty.mean()
 
     return gradient_penalty
 
@@ -112,14 +113,24 @@ class DigitGenerator(nn.Module):
         nn.Module.__init__(self)
         self.latent = latent
         N = NB_DIGITS * DIM
-        self.dense1 = nn.Linear(latent, 128)
-        self.dense2 = nn.Linear(128, 64)
-        self.dense3 = nn.Linear(64, N)
+        self.main = nn.Sequential(
+            # latent channels
+            nn.Linear(latent, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(True),
+            # 128 channels
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(True),
+            # 64 channels
+            nn.Linear(64, N),
+            nn.BatchNorm1d(N)
+            # NB_DIGITS*DIM channels
+        )
 
     def forward(self, input):
-        out = F.relu(self.dense1(input))
-        out = F.relu(self.dense2(out))
-        out = self.dense3(out)
+        out = self.main(input)
+        out = out.view(-1, DIM)
         out = F.softmax(out)
         return out.view(-1, NB_DIGITS, DIM)
 
@@ -138,16 +149,22 @@ class DigitDiscriminator(nn.Module):
         nn.Module.__init__(self)
 
         N = NB_DIGITS * DIM
-        self.dense1 = nn.Linear(N, 128)
-        self.dense2 = nn.Linear(128, 64)
-        self.dense3 = nn.Linear(64, 1)
+        self.main = nn.Sequential(
+            # NB_DIGITS*DIM channels
+            nn.Linear(N, 128),
+            nn.ReLU(True),
+            # 128 channels
+            nn.Linear(128, 64),
+            nn.ReLU(True),
+            # 64 channels
+            nn.Linear(64, 1),
+            # 1 channel
+        )
 
     def forward(self, input):
         N = NB_DIGITS * DIM
         out = input.view(-1, N)
-        out = F.relu(self.dense1(out))
-        out = F.relu(self.dense2(out))
-        out = self.dense3(out)
+        out = self.main(out)
         return out.view(-1, 1)
 
 
@@ -215,6 +232,7 @@ for iteration in tqdm(xrange(args.iterations)):
     for iter_d in xrange(args.critic_iterations):
         # Real data
         real_data = torch.Tensor(data_iter.next())
+        real_data = real_data + 0.1 * torch.rand(real_data.size())
         if args.use_cuda:
             real_data = real_data.cuda()
         real_data = Variable(real_data)
@@ -261,12 +279,18 @@ for iteration in tqdm(xrange(args.iterations)):
     G_cost.backward()
     optimizerG.step()
 
+    # compute precision
+    digits = fake_data.max(-1)[1]
+    count = (digits.sum(-1) == 25).sum().type(torch.FloatTensor)
+    precision = count / args.batch_size * 100
+
     # Write logs and save samples
     log.add_scalar('timePerIteration', time.time() - start_time, iteration)
     log.add_scalar('discriminatorCost', D_cost.cpu().data.numpy(), iteration)
     log.add_scalar('generatorCost', G_cost.cpu().data.numpy(), iteration)
     log.add_scalar('wasserstein', Wasserstein_D.cpu().data.numpy(), iteration)
     log.add_scalar('gradientPenalty', gradient_penalty.cpu().data.numpy(), iteration)
+    log.add_scalar('precision', precision.cpu().data.numpy(), iteration)
 
     # Calculate dev loss and generate samples every 100 iters
     if iteration % args.save_samples == 0:

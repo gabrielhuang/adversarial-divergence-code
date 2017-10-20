@@ -184,7 +184,7 @@ class Generator(nn.Module):
 
 class Discriminator(nn.Module):
 
-    def __init__(self, latent, resolution, batchnorm=True):
+    def __init__(self, latent, resolution, batchnorm=False):
         nn.Module.__init__(self)
         self.latent = latent
         self.resolution = resolution
