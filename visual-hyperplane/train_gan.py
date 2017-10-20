@@ -113,14 +113,23 @@ class DigitGenerator(nn.Module):
         nn.Module.__init__(self)
         self.latent = latent
         N = NB_DIGITS * DIM
-        self.dense1 = nn.Linear(latent, 128)
-        self.dense2 = nn.Linear(128, 64)
-        self.dense3 = nn.Linear(64, N)
-
+        self.main = nn.Sequential([
+            # latent channels
+            nn.Linear(latent, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(True),
+            # 128 channels
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(True),
+            # 64 channels
+            nn.Linear(64, N),
+            nn.BatchNorm1d(N)
+            # NB_DIGITS*DIM channels
+        ])
+        
     def forward(self, input):
-        out = F.relu(self.dense1(input))
-        out = F.relu(self.dense2(out))
-        out = self.dense3(out)
+        out = self.main(input)
         out = out.view(-1, DIM)
         out = F.softmax(out)
         return out.view(-1, NB_DIGITS, DIM)
