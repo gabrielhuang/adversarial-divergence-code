@@ -28,7 +28,9 @@ def aux_count(amount, coins, n_coins):
         sub_solutions = aux_count(amount-coin, coins, n_coins-1)
         solutions += sub_solutions
     return solutions
-    
+
+# alias
+generate_combinations = aux
 
 if __name__ == '__main__':
     print '2 for 10', aux(10, range(10), 2)
