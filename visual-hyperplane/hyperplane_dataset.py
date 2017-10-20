@@ -88,28 +88,32 @@ def get_full_train_test(amount, coins, n_coins, one_hot, validation=0.8, seed=No
 
 if __name__ == '__main__':
     # Generate full dataset, train and test splits
-    full, train, test = get_full_train_test(4, range(4), 3, one_hot=True, seed=0)
-    print 'Length Full', len(full)
-    print 'Length Train', len(train)
-    print 'Length Test', len(test)
-    print
-    print 'Full', full[:]
-    print 'Train', train[:]
-    print 'Test', test[:]
+    for one_hot in [True, False]:
+        print '*'*32
+        print 'One hot is true'
+        print '*'*32
 
-    print 'Is training example in training?', train[0] in train
-    print 'Is training example in test?', train[0] in test
-    print 'Is test example in training?', test[0] in train
-    print 'Is test example in test?', test[0] in test
-
-
-    # Try dataloader
-    data_loader = DataLoader(train, batch_size=5, shuffle=True)
-    for data in data_loader:
-        # This would be the main training loop
-        print 'Training batch'
+        full, train, test = get_full_train_test(4, range(4), 3, one_hot=one_hot, seed=0)
+        print 'Length Full', len(full)
+        print 'Length Train', len(train)
+        print 'Length Test', len(test)
         print
-        print "Now here's an example batch"
-        print 'You might need to cast to torch.Tensor from torch.LongTensor'
-        print data
-        break
+        print 'Full', full[:]
+        print 'Train', train[:]
+        print 'Test', test[:]
+
+        print 'Is training example in training?', train[0] in train
+        print 'Is training example in test?', train[0] in test
+        print 'Is test example in training?', test[0] in train
+        print 'Is test example in test?', test[0] in test
+
+        # Try dataloader
+        data_loader = DataLoader(train, batch_size=5, shuffle=True)
+        for data in data_loader:
+            # This would be the main training loop
+            print 'Training batch'
+            print
+            print "Now here's an example batch"
+            print 'You might need to cast to torch.Tensor from torch.LongTensor'
+            print data
+            break
