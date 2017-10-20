@@ -5,11 +5,14 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import math
 import numpy as np
+import math, os, argparse
 
-import visdom
-vis = visdom.Visdom()
+#import visdom
+#vis = visdom.Visdom()
+
+def numpy2tuple(x):
+    return list(map(tuple,x))
 
 def softmax(input):
     output = Variable(torch.zeros(input.size()))
@@ -22,25 +25,6 @@ def nll_loss(x, x_pred):
     for i in range(x.size()[1]):
         output += F.nll_loss(x_pred[:,i], x[:,i]).float()
     return output
-
-batch_size = 128
-n_epochs = 1000
-n_x = 5
-n_z = 100
-lr = 3e-4
-opts = dict(numbins=45, xtickmin=0, xtickmax=45)
-
-dataset = HyperplaneCachedDataset(25, range(10), n_x)
-dataset = dataset[:].numpy()
-np.random.shuffle(dataset)
-
-train_set, test_set = dataset[:1000], dataset[1000:]
-test_set = Variable(torch.from_numpy(test_set))
-
-for i in range(10):
-    print dataset[dataset==i].size
-
-print 'Length: %i'%len(dataset)
 
 class VAE(nn.Module):
     def __init__(self, n_x, n_z):
@@ -86,26 +70,90 @@ def criterion(x, x_pred,  z_mu, z_logvar):
     loss = log_px + kl
     return loss, log_px, kl
 
+def train(args):
+    batch_size = args.batch_size
+    n_epochs = args.n_epochs
+    lr = args.learning_rate
 
-vae = VAE(n_x, n_z)
-optimizer = optim.Adam(vae.parameters(), lr=lr)
+    optimizer = optim.Adam(vae.parameters(), lr=lr)
+    for e in range(n_epochs):
+        for i in range(0, len(trainset), batch_size):
+            x = Variable(torch.from_numpy(trainset[i:i+batch_size]))
+            optimizer.zero_grad()
 
-z = Variable(torch.zeros(5000,100).normal_())
+            x_pred, z_mu, z_logvar = vae(x)
+            loss, log_px, kl = criterion(x.long(), x_pred, z_mu, z_logvar)
+            loss.backward()
+            optimizer.step()
+            print 'Epoch: %i, Lowerbound: %.2f, %i/%i'%(e, loss.data[0], i, len(trainset))
+        torch.save(vae.state_dict(), os.path.join(output_path, 'checkpoints', '%i.model'%e))
 
-for e in range(n_epochs):
-    for i in range(0, len(train_set), batch_size):
-        x = Variable(torch.from_numpy(train_set[i:i+batch_size]))
-        optimizer.zero_grad()
+def test(args):
+    filename = args.filename
+    N = args.num_samples
 
-        x_pred, z_mu, z_logvar = vae(x)
-        loss, log_px, kl = criterion(x.long(), x_pred, z_mu, z_logvar)
-        loss.backward()
-        optimizer.step()
+    vae.load_state_dict(torch.load(filename))
 
+    z = Variable(torch.zeros(N,n_z).normal_())
     _, x_pred  = vae.decode(z).max(2)
-    vis.histogram(x_pred.sum(1).data.numpy().squeeze(), win=0, opts=opts)
+    x_pred = x_pred.data.numpy().squeeze()
+    #vis.histogram(x_pred.sum(1).squeeze(), win=0, opts=opts)
+    x_true = x_pred[x_pred.sum(1).squeeze()==sum_digits]
 
-    x_pred, z_mu, z_logvar = vae(test_set)
+    x_pred, z_mu, z_logvar = vae(testset)
     _, x_pred = x_pred.max(2)
-    vis.histogram(x_pred.sum(1).data.numpy().squeeze(), win=1, opts=opts)
-    print 'lowerbound: %.2f, L1 error: %.2f'%(loss.data[0], (test_set.float()-x_pred.float()).abs().sum(1).mean().data[0])
+    #vis.histogram(x_pred.sum(1).data.numpy().squeeze(), win=1, opts=opts)
+    print 'L1 error: %.2f, Precision: %.2f, Recall: %.2f'%((testset.float()-x_pred.float()).abs().sum(1).mean().data[0],
+     len(x_true)/float(N)*100, len(set(numpy2tuple(x_true)))/float(len(dataset))*100)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', default=1234, type=int)
+    parser.add_argument('-nz', '--latent-dimension', default=10, type=int)
+    parser.add_argument('-nx', '--n-digits', default=5, type=int)
+    parser.add_argument('-t', '--sum-digits', default=25, type=int)
+    parser.add_argument('-ts', '--train-size', default=0.2, type=float)
+    subparsers = parser.add_subparsers()
+
+    parser_train = subparsers.add_parser('train')
+    parser_train.add_argument('-bs', '--batch-size', default=128, type=int)
+    parser_train.add_argument('--n_epochs', default=1000, type=int)
+    parser_train.add_argument('-lr', '--learning-rate', default=3e-4, type=float)
+    parser_train.set_defaults(func=train)
+
+    parser_test = subparsers.add_parser('test')
+    parser_test.add_argument('-N', '--num-samples', default=10000, type=int)
+    parser_test.add_argument('filename')
+    parser_test.set_defaults(func=test)
+
+
+    args = parser.parse_args()
+
+    n_z = args.latent_dimension
+    n_x = args.n_digits
+    sum_digits = args.sum_digits
+    train_size = args.train_size
+    seed = args.seed
+    output_path = '/checkpoint/hberard/adversarial_divergence/t_%i_nx_%i_ts_%.2f_nz_%i'%(sum_digits,n_x,train_size,n_z)
+    rng = np.random.RandomState(seed=seed)
+    torch.manual_seed(seed)
+
+    print 'Loading Dataset...'
+    dataset = HyperplaneCachedDataset(sum_digits, range(10), n_x)
+    dataset = dataset[:].numpy()
+    rng.shuffle(dataset)
+
+    trainset, testset = dataset[:1000], dataset[1000:]
+    testset = Variable(torch.from_numpy(testset))
+
+    for i in range(10):
+        print '%i appears %i times.'%(i,dataset[dataset==i].size)
+
+    print 'Length: %i'%len(dataset)
+
+    vae = VAE(n_x, n_z)
+
+    if not os.path.exists(os.path.join(output_path, 'checkpoints')):
+        os.makedirs(os.path.join(output_path, 'checkpoints'))
+
+    args.func(args)
