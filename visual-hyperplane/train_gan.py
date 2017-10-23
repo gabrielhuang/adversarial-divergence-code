@@ -20,7 +20,7 @@ parser.add_argument('--save-samples', default=500, type=int, help='save samples 
 parser.add_argument('--save-models', default=5000, type=int, help='save models every N iterations')
 parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
 parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
-parser.add_argument('--use-cuda', default=0, type=int, help='whether to use cuda')
+parser.add_argument('--use-cuda', default=1, type=int, help='whether to use cuda')
 parser.add_argument('--use-gumbel', default=0, type=int, help='whether to use Gumbel reparametrization')
 parser.add_argument('--amount', default=25, type=int, help='target amount')
 parser.add_argument('--nb-digits', default=5, type=int, help='number of digits')
@@ -198,9 +198,9 @@ for iteration in tqdm(xrange(args.iterations)):
         # volatile: do not compute gradient for netG
         # stop gradient at fake_data
         if args.use_gumbel:
-            fake_data = Variable(netG.generate(args.batch_size, tau=tau, volatile=True, use_cuda=args.use_cuda).data)
+            fake_data = Variable(netG.generate(args.batch_size, args.use_cuda, tau=tau, volatile=True).data)
         else:
-            fake_data = Variable(netG.generate(args.batch_size, volatile=True, use_cuda=args.use_cuda).data)
+            fake_data = Variable(netG.generate(args.batch_size, args.use_cuda, volatile=True).data)
 
         D_fake = netD(fake_data).mean()
 
@@ -226,9 +226,9 @@ for iteration in tqdm(xrange(args.iterations)):
     # Generate fake data
     # volatile: compute gradients for netG
     if args.use_gumbel:
-        fake_data = netG.generate(args.batch_size, tau=tau, volatile=False, use_cuda=args.cuda)
+        fake_data = netG.generate(args.batch_size, args.use_cuda, tau=tau, volatile=False)
     else:
-        fake_data = netG.generate(args.batch_size, volatile=False, use_cuda=args.cuda)
+        fake_data = netG.generate(args.batch_size, args.use_cuda, volatile=False)
 
     D_fake = netD(fake_data).mean()
 
@@ -257,9 +257,9 @@ for iteration in tqdm(xrange(args.iterations)):
     if iteration % args.save_samples == 0:
         filename = '{}/softmax_{}.npy'.format(samples_dir, iteration)
         if args.use_gumbel:
-            samples = netG.generate(100, tau=tau)  # by default generate 100 samples
+            samples = netG.generate(100, args.use_cuda, tau=tau)  # by default generate 100 samples
         else:
-            samples = netG.generate(100, tau=tau)
+            samples = netG.generate(100, args.use_cuda, tau=tau)
         samples = samples.data.cpu().numpy()
 
         np.save(filename, samples)

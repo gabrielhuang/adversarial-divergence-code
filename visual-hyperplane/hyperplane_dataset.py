@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
+from torchvision.datasets import MNIST
+from torchvision.transforms import ToTensor
 from sklearn.preprocessing import OneHotEncoder
 from coins import generate_combinations
 import cPickle as pickle
@@ -66,6 +68,29 @@ class HyperplaneWithLookup(Dataset):
         return c in self.set
 
 
+class HyperplaneImageDataset(Dataset):
+    def __init__(self, hyperplane_dataset, root, train, seed=1234):
+        self.rng = np.random.RandomState(seed=seed)
+        self.hyperplane_dataset = hyperplane_dataset
+
+        self.images = MNIST(root=root, train=train, download=True, transform=ToTensor())
+        loader = iter(DataLoader(self.images, batch_size=len(self.images)))
+        _, all_labels = loader.next()
+        all_labels = all_labels.numpy()
+        self.idx = {}
+        for i in range(10):
+            self.idx[i] = np.argwhere(all_labels==i).squeeze()
+
+    def __len__(self):
+        return len(self.hyperplane_dataset)
+
+    def __getitem__(self, idx):
+        x = self.hyperplane_dataset[idx]
+        image = torch.zeros(len(x),28,28)
+        for i in range(len(x)):
+            image[i] = self.images[np.random.choice(self.idx[int(x[i])])][0]
+        return image
+
 def get_full_train_test(amount, coins, n_coins, one_hot, validation=0.8, seed=None):
     # Get main dataset
     full_dataset = generate_hyperplane_dataset(amount, coins, n_coins, one_hot)
@@ -117,3 +142,18 @@ if __name__ == '__main__':
             print 'You might need to cast to torch.Tensor from torch.LongTensor'
             print data
             break
+
+    # Generate image dataset
+    full_dataset = generate_hyperplane_dataset(10, range(10), 3, False)
+    full = HyperplaneImageDataset(full_dataset, 'data/', True)
+    print 'Length Full', len(full)
+
+    # Try dataloader
+    data_loader = DataLoader(full, batch_size=5, shuffle=True)
+    for data in data_loader:
+        # This would be the main training loop
+        print 'Training batch'
+        print
+        print "Now here's an example batch"
+        print data
+        break

@@ -46,7 +46,7 @@ class DigitGenerator(nn.Module):
             # NB_DIGITS*DIM channels
         )
 
-    def forward(self, input, tau=None, use_cuda):
+    def forward(self, input, use_cuda, tau=None):
         out = self.main(input)
         if self.mode == 'gumbel':
             if tau:
@@ -61,15 +61,15 @@ class DigitGenerator(nn.Module):
             out = F.relu(out)
         return out.view(-1, self.nb_digits, self.dim)
 
-    def generate(self, batch_size, tau=None, volatile=True, use_cuda):
+    def generate(self, batch_size, use_cuda, tau=None, volatile=True):
         noise = torch.randn(batch_size, self.latent)
         if use_cuda:
             noise = noise.cuda()
         noise = Variable(noise, volatile=volatile)
         if self.mode == 'gumbel':
-            samples = self(noise, tau=tau, use_cuda=use_cuda)
+            samples = self(noise, use_cuda, tau=tau)
         else:
-            samples = self(noise)
+            samples = self(noise, use_cuda)
         return samples
 
 
