@@ -59,8 +59,8 @@ class VAE(nn.Module):
         x = self.activation(self.dec5(x))
         x = self.activation(self.dec6(x))
         x = self.activation(self.dec7(x))
-        x_mu = self.dec_mu(x))
-        x_logvar = self.dec_sigma(x))
+        x_mu = self.dec_mu(x)
+        x_logvar = self.dec_sigma(x)
 
         return x_mu.view(-1,self.n_digits,28,28), x_logvar.view(-1,self.n_digits,28,28)
 
