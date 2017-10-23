@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import scipy.misc
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
-from elastic_deform import elastic_deform, ElasticDeformCached
+from hyperplane_dataset import HyperplaneImageDataset, get_full_train_test
 
 from models import VAE
 
@@ -33,14 +33,11 @@ parser.add_argument('--save-models', default=1000, type=int, help='save models e
 parser.add_argument('--log-every', default=100, type=int, help='log every N iterations')
 parser.add_argument('--sigma', default=0.1, type=float, help='vae gaussian bandwidth')
 parser.add_argument('--cuda', default=1, type=int, help='use cuda')
-parser.add_argument('--deform', default=1, type=int, help='do random deformations')
-parser.add_argument('--deform-alpha', default=8000., type=float, help='random deformation amplitude')
-parser.add_argument('--deform-sigma', default=70, type=int, help='random deformation bandwidth')
-parser.add_argument('--deform-cache', default=1000, type=int, help='random deformation cache')
-parser.add_argument('--deform-reuse', default=32, type=int, help='how many times to reuse each deformation')
 parser.add_argument('--validation', default=0.1, type=float, help='fraction of validation set')
 parser.add_argument('--validate-every', default=20, type=int, help='validate every N iterations')
 parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
+parser.add_argument('--random-seed', default=1234, type=int, help='random seed')
+parser.add_argument('--mnist', default='data', help='folder where MNIST is/will be downloaded')
 
 args = parser.parse_args()
 print args
@@ -51,70 +48,14 @@ run_dir = '{}/vae-{}-{}-{}'.format(args.logdir, args.resolution, args.latent, da
 models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
-args.deform_size = args.resolution
-factor = args.deform_size / 256.
-alpha = args.deform_alpha * factor**2
-sigma = int(args.deform_sigma * factor)
 
-if args.deform_cache and args.deform:
-    elastic_deform_cached = ElasticDeformCached((args.deform_size, args.deform_size),
-                                                alpha,
-                                                sigma,
-                                                args.deform_cache)
+full, train, test = get_full_train_test(args.amount, range(10), args.n_coins, one_hot=False, validation=0.8, seed=args.seed)
 
-# Create deformation cache
-def make_gray(data):
-    data = data.mean(2)
-    return data
+train_visual = HyperplaneImageDataset(train, args.mnist, train=True)
+test_visual = HyperplaneImageDataset(test, args.mnist, train=False)
+train_loader = DataLoader(train_visual, batch_size=args.batch_size, shuffle=True)
+test_loader = DataLoader(test_visual, batch_size=args.batch_size, shuffle=True)
 
-def deform(data):
-    if args.deform:
-        if args.deform_cache:
-            data = elastic_deform_cached.deform(data)
-        else:
-            data = elastic_deform(data, alpha, sigma, random_state=None)
-    return data
-
-def normalize(data, percentile=80):
-    '''
-    Push digit values close to 1, while background kept close to 0
-    '''
-    mask = data>0.
-    if not np.any(mask):
-        data_max = 1e-8
-    else:
-        data_max = np.percentile(data[mask], percentile)
-    data = np.clip(data / data_max, 0, 1)
-    return data
-
-def resize(img):
-    #img = scipy.misc.imresize(img, (args.resolution, args.resolution), interp='bicubic', mode='F')
-    img = scipy.misc.imresize(img, (args.resolution, args.resolution), interp='bilinear', mode='F')
-    return img
-
-# Load MILA8 dataset
-dataset = datasets.ImageFolder(args.datadir,
-                        transform=transforms.Compose([
-                            transforms.Scale(args.deform_size),
-                            # PIL image
-                            transforms.Lambda(lambda img: 1.-np.asarray(img)/255.),
-                            # Numpy 256 x 256 x 3
-                            transforms.Lambda(make_gray),
-                            # Numpy 256 x 256
-                            transforms.Lambda(deform),
-                            # Numpy args.resolution x args.resolution
-                            transforms.Lambda(normalize),
-                            transforms.Lambda(lambda img: torch.Tensor(img[np.newaxis]))
-                            # Torch 1 x args.resolution x args.resolution
-                        ]))
-dataset_len = len(dataset)
-train_limit = dataset_len - int(args.validation*dataset_len)
-train_loader = DataLoader(dataset, batch_size=args.batch_size,
-                          num_workers=args.threads,
-                          sampler=SubsetRandomSampler(range(0, train_limit)))
-test_loader = DataLoader(dataset, batch_size=args.batch_size,
-                          num_workers=args.threads,
-                          sampler=SubsetRandomSampler(range(train_limit, dataset_len)))
 def infinite_data(loader):
     while True:
         for data in loader:
@@ -122,13 +63,6 @@ def infinite_data(loader):
 train_iter = infinite_data(train_loader)
 test_iter = infinite_data(test_loader)
 
-# Recompute cache every ... ?
-if args.deform_reuse == 0:
-    recompute_cache_every = (len(dataset) * args.deform_cache / args.batch_size)
-else:
-    recompute_cache_every = args.deform_cache * args.deform_reuse / args.batch_size
-recompute_cache_every = max(1, recompute_cache_every)
-print 'Will recompute cache every {} iterations'.format(recompute_cache_every)
 
 # Prepare models
 vae = VAE(args.latent, args.resolution, args.batchnorm)
@@ -208,11 +142,3 @@ for iteration in tqdm(xrange(args.iterations)):
         log.add_scalar('KL_VAL', KLD.data[0], iteration)
         log.add_scalar('MSE_VAL', MSE.data[0], iteration)
 
-    # Recompute deformation cache
-    if (args.deform
-            and args.deform_cache
-            and iteration % recompute_cache_every == 0):
-        print '*'*32
-        print 'Recomputing cache!'
-        print '*'*32
-        elastic_deform_cached.recompute()
