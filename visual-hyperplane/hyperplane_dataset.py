@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
+from torchvision.datasets import MNIST
+from torchvision.transforms import ToTensor
 from sklearn.preprocessing import OneHotEncoder
 from coins import generate_combinations
 import cPickle as pickle
@@ -65,6 +67,28 @@ class HyperplaneWithLookup(Dataset):
             c = tuple(c.numpy())
         return c in self.set
 
+
+class HyperplaneImageDataset(Dataset):
+    def __init__(self, hyperplane_dataset, root, train):
+        self.hyperplane_dataset = hyperplane_dataset
+
+        self.images = MNIST(root=root, train=train, download=True, transform=ToTensor())
+        loader = iter(DataLoader(self.images, batch_size=len(self.images)))
+        _, all_labels = loader.next()
+        all_labels = all_labels.numpy()
+        self.idx = {}
+        for i in range(10):
+            self.idx[i] = np.argwhere(all_labels==i).squeeze()
+
+    def __len__(self):
+        return len(self.hyperplane_dataset)
+
+    def __getitem__(self, idx):
+        x = self.hyperplane_dataset[idx]
+        image = torch.zeros(len(x),28,28)
+        for i in range(len(x)):
+            image[i] = self.images[np.random.choice(self.idx[int(x[i])])][0]
+        return image
 
 def get_full_train_test(amount, coins, n_coins, one_hot, validation=0.8, seed=None):
     # Get main dataset
