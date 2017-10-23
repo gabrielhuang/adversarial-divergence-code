@@ -88,7 +88,7 @@ class HyperplaneImageDataset(Dataset):
         x = self.hyperplane_dataset[idx]
         image = torch.zeros(len(x),28,28)
         for i in range(len(x)):
-            image[i] = self.images[np.random.choice(self.idx[int(x[i])])][0]
+            image[i] = self.images[self.rng.choice(self.idx[int(x[i])])][0]
         return image
 
 def get_full_train_test(amount, coins, n_coins, one_hot, validation=0.8, seed=None):
