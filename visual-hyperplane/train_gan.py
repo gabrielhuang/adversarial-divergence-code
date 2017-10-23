@@ -70,17 +70,6 @@ ANNEAL_TEMP = 1e-5
 tau = INIT_TEMP
 
 
-def gumbel_softmax_sampler(logits, tau, use_cuda=args.use_cuda):
-    noise = torch.rand(logits.size())
-    if args.use_cuda:
-        noise = noise.cuda()
-    noise.add_(1e-9).log_().neg_()
-    noise.add_(1e-9).log_().neg_()
-    noise = Variable(noise)
-    x = (logits + noise) / tau
-    x = F.softmax(x.view(logits.size(0), -1))
-    return x.view_as(logits)
-
 ######################
 # Utilities
 ######################
@@ -237,9 +226,9 @@ for iteration in tqdm(xrange(args.iterations)):
     # Generate fake data
     # volatile: compute gradients for netG
     if args.use_gumbel:
-        fake_data = netG.generate(args.batch_size, tau=tau, volatile=False)
+        fake_data = netG.generate(args.batch_size, tau=tau, volatile=False, use_cuda=args.cuda)
     else:
-        fake_data = netG.generate(args.batch_size, volatile=False)
+        fake_data = netG.generate(args.batch_size, volatile=False, use_cuda=args.cuda)
 
     D_fake = netD(fake_data).mean()
 
