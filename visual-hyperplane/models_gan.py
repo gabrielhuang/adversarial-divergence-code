@@ -37,6 +37,10 @@ class DigitGenerator(nn.Module):
             nn.BatchNorm1d(128),
             nn.ReLU(True),
             # 128 channels
+            nn.Linear(128, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(True),
+            # 128 channels
             nn.Linear(128, 64),
             nn.BatchNorm1d(64),
             nn.ReLU(True),
@@ -83,6 +87,9 @@ class DigitDiscriminator(nn.Module):
         self.main = nn.Sequential(
             # NB_DIGITS*DIM channels
             nn.Linear(N, 128),
+            nn.ReLU(True),
+            # 128 channels
+            nn.Linear(128, 128),
             nn.ReLU(True),
             # 128 channels
             nn.Linear(128, 64),
