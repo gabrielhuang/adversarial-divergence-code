@@ -1,5 +1,7 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 class VAE(nn.Module):
     def __init__(self, n_digits, latent=50, batchnorm=True, activation=F.relu):
