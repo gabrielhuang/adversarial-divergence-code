@@ -38,6 +38,7 @@ parser.add_argument('--validate-every', default=20, type=int, help='validate eve
 parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
 parser.add_argument('--random-seed', default=1234, type=int, help='random seed')
 parser.add_argument('--mnist', default='data', help='folder where MNIST is/will be downloaded')
+parser.add_argument('--sample-rows', default=10, type=int, help='how many samples in tensorboard')
 
 args = parser.parse_args()
 print args
@@ -49,7 +50,7 @@ models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
 
-full, train, test = get_full_train_test(args.amount, range(10), args.n_coins, one_hot=False, validation=0.8, seed=args.seed)
+full, train, test = get_full_train_test(args.amount, range(10), args.len, one_hot=False, validation=0.8, seed=args.seed)
 
 train_visual = HyperplaneImageDataset(train, args.mnist, train=True)
 test_visual = HyperplaneImageDataset(test, args.mnist, train=False)
@@ -83,6 +84,13 @@ def get_loss(data, r_data, mu, logvar):
     loss = KLD + MSE
     return KLD, MSE, loss
 
+def view_sample(data):
+    '''
+    reshape from (batch, args.len, 28, 28) to (batch*args.len, 1, 28, 28)
+    '''
+    size = data.size()
+    return data.view(-1, 1, size[-2], size[-1]) 
+
 # Actual training
 losses = []
 for iteration in tqdm(xrange(args.iterations)):
@@ -115,7 +123,12 @@ for iteration in tqdm(xrange(args.iterations)):
     # Reconstructions
     if iteration % args.save_samples == 0:
         # Reconstruct
-        gallery_rec = torchvision.utils.make_grid(r_data.data, normalize=True, range=(0,1))
+        n_subset = 10
+        view_rec = view_samples(r_data.data, args.sample_rows)
+        view_train = view_samples(data.data, args.sample_rows)
+
+
+        gallery_rec = torchvision.utils.make_grid(view_rec, nrow=len(view_rec), normalize=True, range=(0,1))
         gallery_train = torchvision.utils.make_grid(data.data, normalize=True, range=(0,1))
         log.add_image('train', gallery_train, iteration)
         log.add_image('reconstruction', gallery_rec, iteration)
