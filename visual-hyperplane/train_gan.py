@@ -4,6 +4,7 @@
 import os
 import argparse
 import time
+import json
 from models_gan import DigitDiscriminator, DigitGenerator
 
 
@@ -22,8 +23,8 @@ parser.add_argument('--glr', default=1e-4, type=float, help='generator learning 
 parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
 parser.add_argument('--use-cuda', default=1, type=int, help='whether to use cuda')
 parser.add_argument('--use-gumbel', default=0, type=int, help='whether to use Gumbel reparametrization')
-parser.add_argument('--amount', default=25, type=int, help='target amount')
-parser.add_argument('--nb-digits', default=5, type=int, help='number of digits')
+parser.add_argument('--amount', default=31, type=int, help='target amount')
+parser.add_argument('--nb-digits', default=7, type=int, help='number of digits')
 parser.add_argument('--dim', default=10, type=int, help='dimension of output vectors')
 parser.add_argument('--mode', default='softmax', type=str, help='generator mode')
 
@@ -39,6 +40,9 @@ if not os.path.exists(samples_dir):
 models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
+
+with open('{}/args.json'.format(run_dir), 'wb') as f:
+    json.dump(vars(args), f, indent=4)
 
 
 ######################
@@ -244,7 +248,7 @@ for iteration in tqdm(xrange(args.iterations)):
     digits = fake_data.max(-1)[1]
     count = (digits.sum(-1) == 25).sum().type(torch.FloatTensor)
     precision = count / args.batch_size * 100
-
+    digits_mean = digits.sum(-1).type(torch.FloatTensor).mean()
     # Write logs and save samples
     log.add_scalar('timePerIteration', time.time() - start_time, iteration)
     log.add_scalar('discriminatorCost', D_cost.cpu().data.numpy(), iteration)
@@ -252,20 +256,23 @@ for iteration in tqdm(xrange(args.iterations)):
     log.add_scalar('wasserstein', Wasserstein_D.cpu().data.numpy(), iteration)
     log.add_scalar('gradientPenalty', gradient_penalty.cpu().data.numpy(), iteration)
     log.add_scalar('precision', precision.cpu().data.numpy(), iteration)
+    log.add_scalar('mean sum', digits_mean.cpu().data.numpy(), iteration)
 
     # Calculate dev loss and generate samples every 100 iters
     if iteration % args.save_samples == 0:
         filename = '{}/softmax_{}.npy'.format(samples_dir, iteration)
         if args.use_gumbel:
-            samples = netG.generate(100, args.use_cuda, tau=tau)  # by default generate 100 samples
+            fake_data = netG.generate(100, args.use_cuda, tau=tau)  # by default generate 100 samples
         else:
-            samples = netG.generate(100, args.use_cuda, tau=tau)
-        samples = samples.data.cpu().numpy()
+            fake_data = netG.generate(100, args.use_cuda, tau=tau)
 
-        np.save(filename, samples)
-        filename = '{}/digits_{}.npy'.format(samples_dir, iteration)
-        digits = np.argmax(samples, axis=-1)
-        np.save(filename, digits)
+        # import pdb
+        # pdb.set_trace()
+        log.add_image('digits', fake_data[0].view(1, fake_data.size()[1], fake_data.size()[2]), iteration)
+
+        np_fake_data = fake_data.data.cpu().numpy()
+
+        np.save(filename, np_fake_data)
         print 'Saving samples to {}'.format(filename)
 
     if iteration % args.save_models == 0:
