@@ -69,7 +69,8 @@ class HyperplaneWithLookup(Dataset):
 
 
 class HyperplaneImageDataset(Dataset):
-    def __init__(self, hyperplane_dataset, root, train):
+    def __init__(self, hyperplane_dataset, root, train, seed=1234):
+        self.rng = np.random.RandomState(seed=seed)
         self.hyperplane_dataset = hyperplane_dataset
 
         self.images = MNIST(root=root, train=train, download=True, transform=ToTensor())
@@ -141,3 +142,18 @@ if __name__ == '__main__':
             print 'You might need to cast to torch.Tensor from torch.LongTensor'
             print data
             break
+
+    # Generate image dataset
+    full_dataset = generate_hyperplane_dataset(10, range(10), 3, False)
+    full = HyperplaneImageDataset(full_dataset, 'data/', True)
+    print 'Length Full', len(full)
+
+    # Try dataloader
+    data_loader = DataLoader(full, batch_size=5, shuffle=True)
+    for data in data_loader:
+        # This would be the main training loop
+        print 'Training batch'
+        print
+        print "Now here's an example batch"
+        print data
+        break
