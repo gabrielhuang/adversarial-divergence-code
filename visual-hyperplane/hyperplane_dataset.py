@@ -72,7 +72,7 @@ class HyperplaneImageDataset(Dataset):
     def __init__(self, hyperplane_dataset, root, train=True, seed=1234):
         self.rng = np.random.RandomState(seed=seed)
         self.hyperplane_dataset = hyperplane_dataset
-        assert hyperplane_dataset.one_hot == False, 'Dataset must be non-one-hot'
+        #assert hyperplane_dataset.one_hot == False, 'Dataset must be non-one-hot'
 
         self.images = MNIST(root=root, train=train, download=True, transform=ToTensor())
         loader = iter(DataLoader(self.images, batch_size=len(self.images)))
