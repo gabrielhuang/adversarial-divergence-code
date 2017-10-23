@@ -1,4 +1,4 @@
-from hyperplane_dataset import HyperplaneCachedDataset
+from hyperplane_dataset import get_full_train_test
 from torch.utils.data import DataLoader
 import torch
 from torch.autograd import Variable
@@ -6,13 +6,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
-import math, os, argparse
+import math, os, argparse, csv
 
 #import visdom
 #vis = visdom.Visdom()
-
-def numpy2tuple(x):
-    return list(map(tuple,x))
 
 def softmax(input):
     output = Variable(torch.zeros(input.size()))
@@ -76,13 +73,14 @@ def train(args):
     lr = args.learning_rate
 
     optimizer = optim.Adam(vae.parameters(), lr=lr)
+    data_loader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
     for e in range(n_epochs):
-        for i in range(0, len(trainset), batch_size):
-            x = Variable(torch.from_numpy(trainset[i:i+batch_size]))
+        for i, data in enumerate(data_loader):
+            x = Variable(data)
             optimizer.zero_grad()
 
-            x_pred, z_mu, z_logvar = vae(x)
-            loss, log_px, kl = criterion(x.long(), x_pred, z_mu, z_logvar)
+            x_pred, z_mu, z_logvar = vae(x.float())
+            loss, log_px, kl = criterion(x, x_pred, z_mu, z_logvar)
             loss.backward()
             optimizer.step()
             print 'Epoch: %i, Lowerbound: %.2f, %i/%i'%(e, loss.data[0], i, len(trainset))
@@ -93,26 +91,39 @@ def test(args):
     N = args.num_samples
 
     vae.load_state_dict(torch.load(filename))
+    f = open(os.path.join(output_path, 'results.csv'), 'w')
+    csvwriter = csv.writer(f)
 
-    z = Variable(torch.zeros(N,n_z).normal_())
-    _, x_pred  = vae.decode(z).max(2)
-    x_pred = x_pred.data.numpy().squeeze()
-    #vis.histogram(x_pred.sum(1).squeeze(), win=0, opts=opts)
-    x_true = x_pred[x_pred.sum(1).squeeze()==sum_digits]
+    for n in N:
+        z = Variable(torch.zeros(n,n_z).normal_())
+        _, x_pred  = vae.decode(z).max(2)
+        x_pred = x_pred.data.squeeze()
+        precision = np.count_nonzero(x_pred.sum(1).numpy() == sum_digits)/float(n)
 
-    x_pred, z_mu, z_logvar = vae(testset)
-    _, x_pred = x_pred.max(2)
-    #vis.histogram(x_pred.sum(1).data.numpy().squeeze(), win=1, opts=opts)
-    print 'L1 error: %.2f, Precision: %.2f, Recall: %.2f'%((testset.float()-x_pred.float()).abs().sum(1).mean().data[0],
-     len(x_true)/float(N)*100, len(set(numpy2tuple(x_true)))/float(len(dataset))*100)
+        recall_train = 0.
+        recall_test = 0.
+        seen = set()
+        for i in range(len(x_pred)):
+            if x_pred[i] in trainset and not tuple(x_pred[i]) in seen:
+                recall_train += 1
+            if x_pred[i] in testset and not tuple(x_pred[i]) in seen:
+                recall_test += 1
+            seen.add(tuple(x_pred[i]))
+        recall_train = recall_train/len(trainset)
+        recall_test = recall_test/len(testset)
+        results = (n, precision*100, recall_train*100, recall_test*100)
 
+
+        csvwriter.writerow(results)
+        print 'N: %i, Precision: %.2f, Recall Train: %.2f, Recall Test: %.2f'%results
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', default=1234, type=int)
     parser.add_argument('-nz', '--latent-dimension', default=10, type=int)
     parser.add_argument('-nx', '--n-digits', default=5, type=int)
     parser.add_argument('-t', '--sum-digits', default=25, type=int)
-    parser.add_argument('-ts', '--train-size', default=0.2, type=float)
+    parser.add_argument('-ts', '--test-size', default=0.2, type=float)
+    parser.add_argument('--num-threads', default=1, type=int)
     subparsers = parser.add_subparsers()
 
     parser_train = subparsers.add_parser('train')
@@ -122,7 +133,7 @@ if __name__ == '__main__':
     parser_train.set_defaults(func=train)
 
     parser_test = subparsers.add_parser('test')
-    parser_test.add_argument('-N', '--num-samples', default=10000, type=int)
+    parser_test.add_argument('-N', '--num-samples', default=[10000], type=int, nargs='+')
     parser_test.add_argument('filename')
     parser_test.set_defaults(func=test)
 
@@ -132,24 +143,20 @@ if __name__ == '__main__':
     n_z = args.latent_dimension
     n_x = args.n_digits
     sum_digits = args.sum_digits
-    train_size = args.train_size
+    test_size = args.test_size
     seed = args.seed
-    output_path = '/checkpoint/hberard/adversarial_divergence/t_%i_nx_%i_ts_%.2f_nz_%i'%(sum_digits,n_x,train_size,n_z)
+    output_path = '/checkpoint/hberard/adversarial_divergence/t_%i_nx_%i_ts_%.2f_nz_%i'%(sum_digits,n_x,test_size,n_z)
     rng = np.random.RandomState(seed=seed)
     torch.manual_seed(seed)
+    torch.set_num_threads(args.num_threads)
 
     print 'Loading Dataset...'
-    dataset = HyperplaneCachedDataset(sum_digits, range(10), n_x)
-    dataset = dataset[:].numpy()
-    rng.shuffle(dataset)
-
-    trainset, testset = dataset[:1000], dataset[1000:]
-    testset = Variable(torch.from_numpy(testset))
+    fullset, trainset, testset = get_full_train_test(sum_digits, range(10), n_x, one_hot=False, validation=test_size, seed=seed)
 
     for i in range(10):
-        print '%i appears %i times.'%(i,dataset[dataset==i].size)
+        print '%i appears %i times.'%(i,np.count_nonzero(fullset[:].numpy()==i))
 
-    print 'Length: %i'%len(dataset)
+    print 'Length Training: %i, Length Testing: %i'%(len(trainset), len(testset))
 
     vae = VAE(n_x, n_z)
 
