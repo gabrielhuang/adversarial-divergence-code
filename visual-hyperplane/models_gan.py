@@ -9,7 +9,7 @@ import torch.nn.functional as F
 ########################
 
 
-def gumbel_softmax_sampler(logits, tau, use_cuda=False):
+def gumbel_softmax_sampler(logits, tau, use_cuda):
     noise = torch.rand(logits.size())
     if use_cuda:
         noise = noise.cuda()
@@ -46,7 +46,7 @@ class DigitGenerator(nn.Module):
             # NB_DIGITS*DIM channels
         )
 
-    def forward(self, input, tau=None, use_cuda=False):
+    def forward(self, input, tau=None, use_cuda):
         out = self.main(input)
         if self.mode == 'gumbel':
             if tau:
@@ -61,7 +61,7 @@ class DigitGenerator(nn.Module):
             out = F.relu(out)
         return out.view(-1, self.nb_digits, self.dim)
 
-    def generate(self, batch_size, tau=None, volatile=True, use_cuda=False):
+    def generate(self, batch_size, tau=None, volatile=True, use_cuda):
         noise = torch.randn(batch_size, self.latent)
         if use_cuda:
             noise = noise.cuda()
