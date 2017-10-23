@@ -4,6 +4,7 @@
 import os
 import argparse
 import time
+from models_gan import DigitDiscriminator, DigitGenerator
 
 
 parser = argparse.ArgumentParser(description='Train a GAN on digits')
@@ -14,13 +15,17 @@ parser.add_argument('--batch-size', default=64, type=int, help='minibatch batch 
 parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
 parser.add_argument('--model', default='gan')
 parser.add_argument('--logdir', required=True, help='where to log samples and models')
-parser.add_argument('--double-sided', default=True, action='store_true', help='whether to use double-sided penalty')
+parser.add_argument('--double-sided', default=0, type=int, help='whether to use double-sided penalty')
 parser.add_argument('--save-samples', default=500, type=int, help='save samples every N iterations')
 parser.add_argument('--save-models', default=5000, type=int, help='save models every N iterations')
 parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
 parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
-parser.add_argument('--use-cuda', default=False, type=bool, help='whether to use cuda')
-parser.add_argument('--use-gumbel', default=False, type=bool, help='whether to use Gumbel reparametrization')
+parser.add_argument('--use-cuda', default=1, type=int, help='whether to use cuda')
+parser.add_argument('--use-gumbel', default=0, type=int, help='whether to use Gumbel reparametrization')
+parser.add_argument('--amount', default=25, type=int, help='target amount')
+parser.add_argument('--nb-digits', default=5, type=int, help='number of digits')
+parser.add_argument('--dim', default=10, type=int, help='dimension of output vectors')
+parser.add_argument('--mode', default='softmax', type=str, help='generator mode')
 
 args = parser.parse_args()
 date = time.strftime('%Y-%m-%d.%H%M')
@@ -55,10 +60,6 @@ from hyperplane_dataset import generate_hyperplane_dataset
 ######################
 # Constant
 ######################
-AMOUNT = 25
-NB_DIGITS = 5
-DIM = 10
-
 INIT_TEMP = 1
 MIN_TEMP = 0.5
 ANNEAL_TEMP = 1e-5
@@ -68,16 +69,6 @@ ANNEAL_TEMP = 1e-5
 ######################
 tau = INIT_TEMP
 
-def gumbel_softmax_sampler(logits, tau):
-    noise = torch.rand(logits.size())
-    if args.use_cuda:
-        noise = noise.cuda()
-    noise.add_(1e-9).log_().neg_()
-    noise.add_(1e-9).log_().neg_()
-    noise = Variable(noise)
-    x = (logits + noise) / tau
-    x = F.softmax(x.view(logits.size(0), -1))
-    return x.view_as(logits)
 
 ######################
 # Utilities
@@ -123,75 +114,7 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided=True):
     return gradient_penalty
 
 
-#########################
-# Networks
-########################
 
-class DigitGenerator(nn.Module):
-
-    def __init__(self, latent):
-        nn.Module.__init__(self)
-        self.latent = latent
-        N = NB_DIGITS * DIM
-        self.main = nn.Sequential(
-            # latent channels
-            nn.Linear(latent, 128),
-            nn.BatchNorm1d(128),
-            nn.ReLU(True),
-            # 128 channels
-            nn.Linear(128, 64),
-            nn.BatchNorm1d(64),
-            nn.ReLU(True),
-            # 64 channels
-            nn.Linear(64, N),
-            nn.BatchNorm1d(N)
-            # NB_DIGITS*DIM channels
-        )
-
-    def forward(self, input, tau=None):
-        out = self.main(input)
-        logits = out.view(-1, DIM)
-        if tau:
-            out = gumbel_softmax_sampler(logits, tau)
-        else:
-            out = F.softmax(out)
-        return out.view(-1, NB_DIGITS, DIM)
-
-    def generate(self, batch_size, tau=None, volatile=True):
-        noise = torch.randn(batch_size, self.latent)
-        if args.use_cuda:
-            noise = noise.cuda()
-        noise = Variable(noise, volatile=volatile)
-        if tau:
-            samples = self(noise, tau=tau)
-        else:
-            samples = self(noise)
-        return samples
-
-
-class DigitDiscriminator(nn.Module):
-
-    def __init__(self):
-        nn.Module.__init__(self)
-
-        N = NB_DIGITS * DIM
-        self.main = nn.Sequential(
-            # NB_DIGITS*DIM channels
-            nn.Linear(N, 128),
-            nn.ReLU(True),
-            # 128 channels
-            nn.Linear(128, 64),
-            nn.ReLU(True),
-            # 64 channels
-            nn.Linear(64, 1),
-            # 1 channel
-        )
-
-    def forward(self, input):
-        N = NB_DIGITS * DIM
-        out = input.view(-1, N)
-        out = self.main(out)
-        return out.view(-1, 1)
 
 
 ################################
@@ -201,8 +124,8 @@ class DigitDiscriminator(nn.Module):
 ######################
 # Create Models
 ######################
-netG = DigitGenerator(args.latent)
-netD = DigitDiscriminator()
+netG = DigitGenerator(args.nb_digits, args.dim, args.latent, mode=args.mode)
+netD = DigitDiscriminator(args.nb_digits, args.dim)
 print netG
 print netD
 if args.use_cuda:
@@ -214,7 +137,7 @@ optimizerG = Adam(netG.parameters(), lr=args.glr, betas=(0.5, 0.9))
 ######################
 # Load data
 ######################
-dataset = generate_hyperplane_dataset(AMOUNT, range(DIM), NB_DIGITS, True)
+dataset = generate_hyperplane_dataset(args.amount, range(args.dim), args.nb_digits, True)
 data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
 
@@ -275,9 +198,9 @@ for iteration in tqdm(xrange(args.iterations)):
         # volatile: do not compute gradient for netG
         # stop gradient at fake_data
         if args.use_gumbel:
-            fake_data = Variable(netG.generate(args.batch_size, tau=tau, volatile=True).data)
+            fake_data = Variable(netG.generate(args.batch_size, args.use_cuda, tau=tau, volatile=True).data)
         else:
-            fake_data = Variable(netG.generate(args.batch_size, volatile=True).data)
+            fake_data = Variable(netG.generate(args.batch_size, args.use_cuda, volatile=True).data)
 
         D_fake = netD(fake_data).mean()
 
@@ -303,9 +226,9 @@ for iteration in tqdm(xrange(args.iterations)):
     # Generate fake data
     # volatile: compute gradients for netG
     if args.use_gumbel:
-        fake_data = netG.generate(args.batch_size, tau=tau, volatile=False)
+        fake_data = netG.generate(args.batch_size, args.use_cuda, tau=tau, volatile=False)
     else:
-        fake_data = netG.generate(args.batch_size, volatile=False)
+        fake_data = netG.generate(args.batch_size, args.use_cuda, volatile=False)
 
     D_fake = netD(fake_data).mean()
 
@@ -334,9 +257,9 @@ for iteration in tqdm(xrange(args.iterations)):
     if iteration % args.save_samples == 0:
         filename = '{}/softmax_{}.npy'.format(samples_dir, iteration)
         if args.use_gumbel:
-            samples = netG.generate(100, tau=tau)  # by default generate 100 samples
+            samples = netG.generate(100, args.use_cuda, tau=tau)  # by default generate 100 samples
         else:
-            samples = netG.generate(100, tau=tau)
+            samples = netG.generate(100, args.use_cuda, tau=tau)
         samples = samples.data.cpu().numpy()
 
         np.save(filename, samples)
