@@ -223,19 +223,20 @@ class ImageDiscriminator(nn.Module):
 
 
 class UnconstrainedImageGenerator(nn.Module):
-    def __init__(self, latent, nb_digits):
+    def __init__(self, latent, nb_digits, size=32):
         nn.Module.__init__(self)
         self.latent = latent
         self.nb_digits = nb_digits
+        self.size = size
 
         self.deconv_sizes = [
             [latent, None, None, None],
             # 1 x 1 - latent
-            [128, 4, 1, 0],
+            [size*8, 4, 1, 0],
             # 4 x 4 - 128
-            [128, 4, 2, 1],
+            [size*4, 4, 2, 1],
             # 8 x 8 - 128
-            [64, 4, 2, 2],
+            [size*2, 4, 2, 2],
             # 14 x 14 - 64
             [self.nb_digits, 4, 2, 1]
             # 28 x 18 - 1
@@ -259,20 +260,23 @@ class UnconstrainedImageGenerator(nn.Module):
 
 
 class UnconstrainedImageDiscriminator(nn.Module):
-    def __init__(self, nb_digits):
+    def __init__(self, nb_digits, size=32):
         nn.Module.__init__(self)
         self.nb_digits = nb_digits
+        self.size = size
         self.sizes = [
             [nb_digits, None, None, None],
             # 28 x 28 - nb_digits
-            [32, 4, 2, 1],
-            # 14 x 14 - 32
-            [32, 4, 2, 2],
-            # 8 x 8 - 32
-            [64, 4, 2, 1],
-            # 4 x 4 - 64
-            [128, 4, 1, 0]
-            # 1 x 1 - 128
+            [size*1, 4, 2, 1],
+            # 14 x 14 - size
+            [size*2, 4, 2, 2],
+            # 8 x 8 - size*2
+            [size*4, 4, 2, 1],
+            # 4 x 4 - size*4
+            [size*8, 4, 1, 0],
+            # 1 x 1 - size*8
+            [1, 1, 1, 0]
+            # 1 x 1 - 1
         ]
         self.main = nn.Sequential(
             *build_cnn(self.sizes, batchnorm=False, deconv=False)
