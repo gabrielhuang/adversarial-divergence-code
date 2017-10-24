@@ -14,15 +14,14 @@ import scipy.misc
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
 from hyperplane_dataset import HyperplaneImageDataset, get_full_train_test
 
-from models import VAE
+from models import VAE, UnconstrainedVAE
 
-resolutions = [32,64,128,256,512]
 
 parser = argparse.ArgumentParser(description='Train VAE on MILA-8')
-parser.add_argument('--datadir', help='path to image folder')
+parser.add_argument('--amount', default=25, type=int, help='target to sum up to')
+parser.add_argument('--digits', default=5, type=int, help='how many digits per sequence')
 parser.add_argument('--iterations', default=100000, type=int, help='iterations')
 parser.add_argument('--batch_size', default=64, type=int, help='minibatch size')
-parser.add_argument('--resolution', required=True, type=int, help='|'.join(map(str, resolutions)))
 parser.add_argument('--batchnorm', default=1, type=int, help='whether to use batchnorm')
 parser.add_argument('--latent', default=64, type=int, help='latent dimensions')
 parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
@@ -38,18 +37,19 @@ parser.add_argument('--validate-every', default=20, type=int, help='validate eve
 parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
 parser.add_argument('--random-seed', default=1234, type=int, help='random seed')
 parser.add_argument('--mnist', default='data', help='folder where MNIST is/will be downloaded')
+parser.add_argument('--sample-rows', default=10, type=int, help='how many samples in tensorboard')
+
 
 args = parser.parse_args()
 print args
-assert args.resolution in resolutions
 date = time.strftime('%Y-%m-%d.%H%M')
-run_dir = '{}/vae-{}-{}-{}'.format(args.logdir, args.resolution, args.latent, date)
+run_dir = '{}/vae-{}-{}'.format(args.logdir, args.latent, date)
 # Create models dir if deosnt exist
 models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
 
-full, train, test = get_full_train_test(args.amount, range(10), args.n_coins, one_hot=False, validation=0.8, seed=args.seed)
+full, train, test = get_full_train_test(args.amount, range(10), args.digits, one_hot=False, validation=0.8, seed=args.random_seed)
 
 train_visual = HyperplaneImageDataset(train, args.mnist, train=True)
 test_visual = HyperplaneImageDataset(test, args.mnist, train=False)
@@ -65,7 +65,7 @@ test_iter = infinite_data(test_loader)
 
 
 # Prepare models
-vae = VAE(args.latent, args.resolution, args.batchnorm)
+vae = UnconstrainedVAE(args.latent, args.digits, args.batchnorm)
 if args.cuda:
     vae = vae.cuda()
 print vae
@@ -82,6 +82,15 @@ def get_loss(data, r_data, mu, logvar):
     MSE = 0.5 / args.sigma * torch.sum((r_data - data)**2) / data.size()[0]
     loss = KLD + MSE
     return KLD, MSE, loss
+
+def view_samples(data, max_samples=None):
+    '''
+    reshape from (batch, args.digits, 28, 28) to (batch*args.digits, 1, 28, 28)
+    '''
+    if max_samples:
+        data = data[:min(max_samples, len(data))]
+    size = data.size()
+    return data.view(-1, 1, size[-2], size[-1]) 
 
 # Actual training
 losses = []
@@ -115,13 +124,18 @@ for iteration in tqdm(xrange(args.iterations)):
     # Reconstructions
     if iteration % args.save_samples == 0:
         # Reconstruct
-        gallery_rec = torchvision.utils.make_grid(r_data.data, normalize=True, range=(0,1))
-        gallery_train = torchvision.utils.make_grid(data.data, normalize=True, range=(0,1))
+        view_rec = view_samples(r_data.data, args.sample_rows)
+        view_train = view_samples(data.data, args.sample_rows)
+
+        gallery_rec = torchvision.utils.make_grid(view_rec, nrow=len(r_data), normalize=True, range=(0,1))
+        gallery_train = torchvision.utils.make_grid(view_train, nrow=len(data), normalize=True, range=(0,1))
         log.add_image('train', gallery_train, iteration)
         log.add_image('reconstruction', gallery_rec, iteration)
+
         # Generate 100 images
-        samples = vae.generate(args.generate_samples, use_cuda=args.cuda)
-        gallery_gen = torchvision.utils.make_grid(samples.data, normalize=True, range=(0,1))
+        samples = vae.generate(args.sample_rows, use_cuda=args.cuda)
+        view_gen = view_samples(samples.data, args.generate_samples)
+        gallery_gen = torchvision.utils.make_grid(view_gen, nrow=len(samples), normalize=True, range=(0,1))
         log.add_image('generation', gallery_gen, iteration)
 
     # Models

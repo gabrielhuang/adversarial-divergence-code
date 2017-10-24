@@ -72,7 +72,7 @@ class HyperplaneImageDataset(Dataset):
     def __init__(self, hyperplane_dataset, root, train=True, seed=1234):
         self.rng = np.random.RandomState(seed=seed)
         self.hyperplane_dataset = hyperplane_dataset
-        assert hyperplane_dataset.one_hot == False, 'Dataset must be non-one-hot'
+        #assert hyperplane_dataset.one_hot == False, 'Dataset must be non-one-hot'
 
         self.images = MNIST(root=root, train=train, download=True, transform=ToTensor())
         loader = iter(DataLoader(self.images, batch_size=len(self.images)))
@@ -90,7 +90,7 @@ class HyperplaneImageDataset(Dataset):
         image = torch.zeros(len(x),28,28)
         for i in range(len(x)):
             image[i] = self.images[self.rng.choice(self.idx[int(x[i])])][0]
-        return image
+        return image, x
 
 def get_full_train_test(amount, coins, n_coins, one_hot, validation=0.8, seed=None):
     # Get main dataset
