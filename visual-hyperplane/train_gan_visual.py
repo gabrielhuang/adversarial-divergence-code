@@ -45,6 +45,7 @@ parser.add_argument('--latent-global', default=64, type=int, help='global latent
 parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
 parser.add_argument('--model-generator', default='constrained', help='constrained|unconstrained')
 parser.add_argument('--model-discriminator', default='constrained', help='constrained|unconstrained')
+parser.add_argument('--unconstrained-size', default=32, type=int, help='size of disc/gen in unconstrained case')
 
 args = parser.parse_args()
 assert args.model_generator in ['constrained', 'unconstrained']
@@ -129,11 +130,11 @@ test_iter = infinite_data(test_loader)
 
 # Prepare models
 if args.model_discriminator == 'unconstrained':
-    netD = UnconstrainedImageDiscriminator(args.nb_digits)
+    netD = UnconstrainedImageDiscriminator(args.nb_digits, args.unconstrained_size)
 else:
     netD = ImageDiscriminator(args.nb_digits)
 if args.model_generator == 'unconstrained':
-    netG = UnconstrainedImageGenerator(args.latent_global, args.nb_digits)
+    netG = UnconstrainedImageGenerator(args.latent_global, args.nb_digits, args.unconstrained_size)
 else:
     netG = ImageGenerator(args.latent_global, args.latent_local, args.nb_digits)
 
