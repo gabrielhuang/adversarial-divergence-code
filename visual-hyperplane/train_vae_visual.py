@@ -19,6 +19,21 @@ from models import VAE, UnconstrainedVAE
 
 parser = argparse.ArgumentParser(description='Train VAE on MILA-8')
 
+# general learning
+parser.add_argument('--iterations', default=100000, type=int, help='iterations')
+parser.add_argument('--batch_size', default=64, type=int, help='minibatch size')
+parser.add_argument('--threads', default=8, type=int, help='number of threads for data loading')
+parser.add_argument('--logdir', required=True, help='where to log samples and models')
+parser.add_argument('--save-samples', default=100, type=int, help='save samples every')
+parser.add_argument('--save-models', default=1000, type=int, help='save models every')
+parser.add_argument('--log-every', default=100, type=int, help='log every N iterations')
+parser.add_argument('--cuda', default=1, type=int, help='use cuda')
+parser.add_argument('--validate-every', default=20, type=int, help='validate every N iterations')
+parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
+parser.add_argument('--random-seed', default=1234, type=int, help='random seed')
+parser.add_argument('--mnist', default='data', help='folder where MNIST is/will be downloaded')
+parser.add_argument('--sample-rows', default=10, type=int, help='how many samples in tensorboard')
+
 # task specific
 parser.add_argument('--amount', default=25, type=int, help='target to sum up to')
 parser.add_argument('--digits', default=5, type=int, help='how many digits per sequence')
@@ -29,22 +44,6 @@ parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
 parser.add_argument('--latent', default=64, type=int, help='latent dimensions')
 parser.add_argument('--sigma', default=0.1, type=float, help='vae gaussian bandwidth')
 parser.add_argument('--model', choices=['unconstrained', 'constrained'], required=True, help="The vae model to choose from ('unconstrained','constrained')")
-
-# general learning
-parser.add_argument('--iterations', default=100000, type=int, help='iterations')
-parser.add_argument('--batch_size', default=64, type=int, help='minibatch size')
-parser.add_argument('--threads', default=8, type=int, help='number of threads for data loading')
-parser.add_argument('--logdir', required=True, help='where to log samples and models')
-parser.add_argument('--save-samples', default=100, type=int, help='save samples every')
-parser.add_argument('--save-models', default=1000, type=int, help='save models every')
-parser.add_argument('--log-every', default=100, type=int, help='log every N iterations')
-parser.add_argument('--cuda', default=1, type=int, help='use cuda')
-parser.add_argument('--validation', default=0.1, type=float, help='fraction of validation set')
-parser.add_argument('--validate-every', default=20, type=int, help='validate every N iterations')
-parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
-parser.add_argument('--random-seed', default=1234, type=int, help='random seed')
-parser.add_argument('--mnist', default='data', help='folder where MNIST is/will be downloaded')
-parser.add_argument('--sample-rows', default=10, type=int, help='how many samples in tensorboard')
 
 args = parser.parse_args()
 print args
