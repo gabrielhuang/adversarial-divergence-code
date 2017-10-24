@@ -147,7 +147,8 @@ for iteration in tqdm(xrange(args.iterations)):
         # Generate 100 images
         samples = vae.generate(args.sample_rows, use_cuda=args.cuda)
         view_gen = view_samples(samples.data, args.generate_samples)
-        gallery_gen = torchvision.utils.make_grid(view_gen, nrow=len(samples), normalize=True, range=(0,1))
+        gallery_gen = torchvision.utils.make_grid(view_gen,
+            nrow=args.digits, normalize=True, range=(0,1))
         log.add_image('generation', gallery_gen, iteration)
 
     # Models
