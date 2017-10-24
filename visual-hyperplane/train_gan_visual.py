@@ -91,6 +91,8 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided, cuda):
     D_interpolates = netD(interpolates)
 
     ones = torch.ones(D_interpolates.size())
+    if cuda:
+        ones = ones.cuda()
 
     gradients = grad(outputs=D_interpolates, inputs=interpolates_flat,
                      grad_outputs=ones, create_graph=True, retain_graph=True, only_inputs=True)[0]
