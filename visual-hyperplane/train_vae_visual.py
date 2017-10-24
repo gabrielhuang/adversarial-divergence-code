@@ -38,6 +38,7 @@ parser.add_argument('--generate-samples', default=64, type=int, help='generate N
 parser.add_argument('--random-seed', default=1234, type=int, help='random seed')
 parser.add_argument('--mnist', default='data', help='folder where MNIST is/will be downloaded')
 parser.add_argument('--sample-rows', default=10, type=int, help='how many samples in tensorboard')
+parser.add_argument('--model', choices=['unconstrained', 'constrained'], required=True, help="The vae model to choose from ('unconstrained','constrained')")
 
 
 args = parser.parse_args()
@@ -65,7 +66,12 @@ test_iter = infinite_data(test_loader)
 
 
 # Prepare models
-vae = UnconstrainedVAE(args.latent, args.digits, args.batchnorm)
+if args.model == 'unconstrained':
+    vae = UnconstrainedVAE(args.latent, args.digits, batchnorm=args.batchnorm)
+elif args.model == 'constrained':
+    vae = VAE(args.digits, args.latent, batchnorm=False)
+else:
+    raise ValueError('Model not specified.')
 if args.cuda:
     vae = vae.cuda()
 print vae
@@ -127,18 +133,15 @@ for iteration in tqdm(xrange(args.iterations)):
         view_rec = view_samples(r_data.data, args.sample_rows)
         view_train = view_samples(data.data, args.sample_rows)
 
-        gallery_rec = torchvision.utils.make_grid(view_rec,
-            nrow=args.digits, normalize=True, range=(0,1))
-        gallery_train = torchvision.utils.make_grid(view_train,
-            nrow=args.digits, normalize=True, range=(0,1))
+        gallery_rec = torchvision.utils.make_grid(view_rec, nrow=len(r_data), normalize=True, range=(0,1))
+        gallery_train = torchvision.utils.make_grid(view_train, nrow=len(data), normalize=True, range=(0,1))
         log.add_image('train', gallery_train, iteration)
         log.add_image('reconstruction', gallery_rec, iteration)
 
         # Generate 100 images
         samples = vae.generate(args.sample_rows, use_cuda=args.cuda)
         view_gen = view_samples(samples.data, args.generate_samples)
-        gallery_gen = torchvision.utils.make_grid(view_gen,
-            nrow=args.digits, normalize=True, range=(0,1))
+        gallery_gen = torchvision.utils.make_grid(view_gen, nrow=len(samples), normalize=True, range=(0,1))
         log.add_image('generation', gallery_gen, iteration)
 
     # Models
@@ -158,4 +161,3 @@ for iteration in tqdm(xrange(args.iterations)):
         log.add_scalar('loss_VAL', loss.data[0], iteration)
         log.add_scalar('KL_VAL', KLD.data[0], iteration)
         log.add_scalar('MSE_VAL', MSE.data[0], iteration)
-
