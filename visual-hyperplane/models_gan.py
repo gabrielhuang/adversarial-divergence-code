@@ -167,7 +167,7 @@ class ImageGenerator(nn.Module):
             *build_mlp(self.latent_sizes, batchnorm=True)
         )
         self.get_images = nn.Sequential(
-            *build_cnn(self.deconv_sizes, batchnorm=True)
+            *build_cnn(self.deconv_sizes, batchnorm=True, deconv=True)
         )
 
     def forward(self, input):
@@ -184,6 +184,32 @@ class ImageGenerator(nn.Module):
         noise = Variable(noise, volatile=volatile)
         samples = self(noise)
         return samples
+
+
+class ImageDiscriminator(nn.Module):
+    def __init__(self, nb_digits):
+        nn.Module.__init__(self)
+        self.nb_digits = nb_digits
+        self.sizes = [
+            [nb_digits, None, None, None],
+            # 28 x 28 - nb_digits
+            [32, 4, 2, 1],
+            # 14 x 14 - 32
+            [32, 4, 2, 2],
+            # 8 x 8 - 32
+            [64, 4, 2, 1],
+            # 4 x 4 - 64
+            [128, 4, 1, 0]
+            # 1 x 1 - 128
+        ]
+        self.main = nn.Sequential(
+            *build_cnn(self.sizes, batchnorm=False, deconv=False)
+        )
+
+    def forward(self, input):
+        out = self.main(input)
+        return out.view(-1, 1)
+
 
 
 
