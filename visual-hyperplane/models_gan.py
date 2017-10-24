@@ -312,10 +312,11 @@ class SemiSupervisedImageDiscriminator(nn.Module):
 
     def forward(self, input):
         out = self.main(input)
+        out = out.view(len(input), -1)
         out = self.discriminator_output(out)
         c_out = self.classifier_output(out)
         c_out = c_out.view(-1, 10)
-        c_out = F.logsoftmax(c_out)
+        c_out = F.log_softmax(c_out)
         self.c_out = c_out
         return out.view(-1, 1)
 

@@ -4,13 +4,14 @@ from tqdm import tqdm
 import argparse
 import json
 import torch
+from torch import nn
 from torch.autograd import Variable
 import torchvision
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.autograd import grad
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
-from models_gan import ImageDiscriminator, ImageGenerator, UnconstrainedImageDiscriminator, UnconstrainedImageGenerator
+from models_gan import ImageDiscriminator, ImageGenerator, UnconstrainedImageDiscriminator, UnconstrainedImageGenerator, SemiSupervisedImageDiscriminator
 from hyperplane_dataset import get_full_train_test, HyperplaneImageDataset
 
 parser = argparse.ArgumentParser(description='Train GAN with visual hyperplane')
@@ -131,8 +132,10 @@ test_iter = infinite_data(test_loader)
 # Prepare models
 if args.model_discriminator == 'unconstrained':
     netD = UnconstrainedImageDiscriminator(args.nb_digits, args.unconstrained_size)
-else:
+elif args.model_discriminator == 'constrained':
     netD = ImageDiscriminator(args.nb_digits)
+elif args.model_discriminator == 'semi':
+    netD = SemiSupervisedImageDiscriminator(args.nb_digits)
 if args.model_generator == 'unconstrained':
     netG = UnconstrainedImageGenerator(args.latent_global, args.nb_digits, args.unconstrained_size)
 else:
@@ -192,6 +195,8 @@ for iteration in tqdm(xrange(args.iterations)):
         Wasserstein_D = D_real - D_fake
 
         if args.model_discriminator == 'semi':
+            import pdb
+            pdb.set_trace()
             prediction = netD.get_prediction()
             ground_truth = real_labels.view(-1, 1)
             classification_cost = nll_criterion(prediction, ground_truth)
