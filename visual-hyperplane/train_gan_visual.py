@@ -49,12 +49,12 @@ parser.add_argument('--model-discriminator', default='constrained', help='constr
 args = parser.parse_args()
 assert args.model_generator in ['constrained', 'unconstrained']
 assert args.model_discriminator in ['constrained', 'unconstrained']
-short = {'constrained': 'C', unconstrained: 'U'}
+short = {'constrained': 'C', 'unconstrained': 'U'}
 print args
 
 date = time.strftime('%Y-%m-%d.%H%M')
 run_dir = '{}/gan-d{}g{}-{}'.format(args.logdir, short[args.model_generator],
-                                short[args.model_discriminator], args.model date)
+                                short[args.model_discriminator], date)
 # Create models dir if deosnt exist
 models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
