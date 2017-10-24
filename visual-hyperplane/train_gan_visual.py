@@ -91,8 +91,10 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided, cuda):
     D_interpolates = netD(interpolates)
 
     ones = torch.ones(D_interpolates.size())
+    zeros = Variable(torch.zeros(len(real_data)))  # has to be variable
     if cuda:
         ones = ones.cuda()
+        zeros = zeros.cuda()
 
     gradients = grad(outputs=D_interpolates, inputs=interpolates_flat,
                      grad_outputs=ones, create_graph=True, retain_graph=True, only_inputs=True)[0]
@@ -100,7 +102,7 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided, cuda):
     if double_sided:
         gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     else:
-        gradient_penalty, __ = torch.max((gradients*gradients).sum(1)-1, 0)
+        gradient_penalty = torch.max((gradients*gradients).sum(1)-1, zeros)
         gradient_penalty = gradient_penalty.mean()
 
     return gradient_penalty
