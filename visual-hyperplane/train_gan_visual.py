@@ -10,7 +10,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.autograd import grad
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
-from models_gan import ImageDiscriminator, ImageGenerator
+from models_gan import ImageDiscriminator, ImageGenerator, UnconstrainedDiscriminator, UnconstrainedGenerator
 from hyperplane_dataset import get_full_train_test, HyperplaneImageDataset
 
 parser = argparse.ArgumentParser(description='Train GAN with visual hyperplane')
@@ -43,9 +43,12 @@ parser.add_argument('--batchnorm', default=1, type=int, help='whether to use bat
 parser.add_argument('--latent_local', default=10, type=int, help='local latent dimensions for each image')
 parser.add_argument('--latent_global', default=64, type=int, help='global latent dimensions')
 parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
-parser.add_argument('--sigma', default=0.1, type=float, help='vae gaussian bandwidth')
+parser.add_argument('--model-generator', default='constrained', help='constrained|unconstrained')
+parser.add_argument('--model-discriminator', default='constrained', help='constrained|unconstrained')
 
 args = parser.parse_args()
+assert args.model_generator in ['constrained', 'unconstrained']
+assert args.model_discriminator in ['constrained', 'unconstrained']
 print args
 
 date = time.strftime('%Y-%m-%d.%H%M')
@@ -119,8 +122,15 @@ train_iter = infinite_data(train_loader)
 test_iter = infinite_data(test_loader)
 
 # Prepare models
-netD = ImageDiscriminator(args.nb_digits)
-netG = ImageGenerator(args.latent_global, args.latent_local, args.nb_digits)
+if args.model_discriminator == 'unconstrained':
+    netD = UnconstrainedImageDiscriminator(args.nb_digits)
+else:
+    netD = ImageDiscriminator(args.nb_digits)
+if args.model_generator == 'unconstrained':
+    netG = UnconstrainedImageGenerator(args.latent_global, args.nb_digita)
+else:
+    netG = ImageGenerator(args.latent_global, args.latent_local, args.nb_digits)
+
 if args.use_cuda:
     netD = netD.cuda()
     netG = netG.cuda()
