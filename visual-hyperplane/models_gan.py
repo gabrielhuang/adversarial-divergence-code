@@ -218,7 +218,6 @@ class ImageDiscriminator(nn.Module):
         out = input.view(-1, 1, 28, 28)
         out = self.conv(out)
         out = out.view(len(input), -1)
-        print out.size()
         out = self.mlp(out)
         return out.view(-1, 1)
 

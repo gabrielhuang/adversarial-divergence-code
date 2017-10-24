@@ -10,7 +10,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.autograd import grad
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
-from models_gan import ImageDiscriminator, ImageGenerator, UnconstrainedDiscriminator, UnconstrainedGenerator
+from models_gan import ImageDiscriminator, ImageGenerator, UnconstrainedImageDiscriminator, UnconstrainedImageGenerator
 from hyperplane_dataset import get_full_train_test, HyperplaneImageDataset
 
 parser = argparse.ArgumentParser(description='Train GAN with visual hyperplane')
