@@ -172,13 +172,13 @@ class ImageGenerator(nn.Module):
 
     def forward(self, input):
         latent_vars = self.get_latents(input)
-        latent_vars = latent_vars.view(-1, self.latent_visual)
+        latent_vars = latent_vars.view(-1, self.latent_visual, 1, 1)
         images = self.get_images(latent_vars)
         images = images.view(-1, self.nb_digits, 28, 28)
         return images
 
     def generate(self, batch_size, use_cuda, volatile=True):
-        noise = torch.randn(batch_size, self.latent)
+        noise = torch.randn(batch_size, self.latent_global)
         if use_cuda:
             noise = noise.cuda()
         noise = Variable(noise, volatile=volatile)
@@ -209,10 +209,3 @@ class ImageDiscriminator(nn.Module):
     def forward(self, input):
         out = self.main(input)
         return out.view(-1, 1)
-
-
-
-
-
-
-

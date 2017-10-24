@@ -77,10 +77,6 @@ tau = INIT_TEMP
 ######################
 # Utilities
 ######################
-if args.use_cuda:
-    ZEROS = Variable(torch.zeros((args.batch_size)).cuda())
-else:
-    ZEROS = Variable(torch.zeros((args.batch_size)))
 
 
 def get_gradient_penalty(netD, real_data, fake_data, double_sided=True):
