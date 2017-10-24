@@ -128,9 +128,9 @@ for iteration in tqdm(xrange(args.iterations)):
         view_train = view_samples(data.data, args.sample_rows)
 
         gallery_rec = torchvision.utils.make_grid(view_rec,
-            nrow=args.digits, args.sample_rows), normalize=True, range=(0,1))
+            nrow=args.digits, normalize=True, range=(0,1))
         gallery_train = torchvision.utils.make_grid(view_train,
-            nrow=args.digits, args.sample_rows), normalize=True, range=(0,1))
+            nrow=args.digits, normalize=True, range=(0,1))
         log.add_image('train', gallery_train, iteration)
         log.add_image('reconstruction', gallery_rec, iteration)
 
