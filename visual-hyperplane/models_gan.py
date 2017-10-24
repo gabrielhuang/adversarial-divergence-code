@@ -190,6 +190,79 @@ class ImageDiscriminator(nn.Module):
     def __init__(self, nb_digits):
         nn.Module.__init__(self)
         self.nb_digits = nb_digits
+        self.conv_sizes = [
+            [1, None, None, None],
+            # 28 x 28 - nb_digits
+            [32, 4, 2, 1],
+            # 14 x 14 - 32
+            [32, 4, 2, 2],
+            # 8 x 8 - 32
+            [64, 4, 2, 1],
+            # 4 x 4 - 64
+            [128, 4, 1, 0]
+            # 1 x 1 - 128
+        ]
+        self.conv = nn.Sequential(
+            *build_cnn(self.conv_sizes, batchnorm=False, deconv=False)
+        )
+        self.mlp_sizes = [
+            [128*self.nb_digits, 128],
+            [128, 128],
+            [128, 1]
+        ]
+        self.mlp = nn.Sequential(
+            *build_mlp(self.mlp_sizes, batchnorm=False)
+        )
+
+    def forward(self, input):
+        out = input.view(-1, 1, 28, 28)
+        out = self.conv(out)
+        out = out.view(len(input), -1)
+        print out.size()
+        out = self.mlp(out)
+        return out.view(-1, 1)
+
+
+class UnconstrainedImageGenerator(nn.Module):
+    def __init__(self, latent, nb_digits):
+        nn.Module.__init__(self)
+        self.latent = latent
+        self.nb_digits = nb_digits
+
+        self.deconv_sizes = [
+            [latent, None, None, None],
+            # 1 x 1 - latent
+            [128, 4, 1, 0],
+            # 4 x 4 - 128
+            [128, 4, 2, 1],
+            # 8 x 8 - 128
+            [64, 4, 2, 2],
+            # 14 x 14 - 64
+            [self.nb_digits, 4, 2, 1]
+            # 28 x 18 - 1
+        ]
+        self.deconv = nn.Sequential(
+            *build_cnn(self.deconv_sizes, batchnorm=True, deconv=True)
+        )
+
+    def forward(self, input):
+        out = input.view(-1, self.latent, 1, 1)
+        out = self.deconv(out)
+        return out
+
+    def generate(self, batch_size, use_cuda, volatile=True):
+        noise = torch.randn(batch_size, self.latent)
+        if use_cuda:
+            noise = noise.cuda()
+        noise = Variable(noise, volatile=volatile)
+        samples = self(noise)
+        return samples
+
+
+class UnconstrainedImageDiscriminator(nn.Module):
+    def __init__(self, nb_digits):
+        nn.Module.__init__(self)
+        self.nb_digits = nb_digits
         self.sizes = [
             [nb_digits, None, None, None],
             # 28 x 28 - nb_digits
@@ -211,8 +284,11 @@ class ImageDiscriminator(nn.Module):
         return out.view(-1, 1)
 
 
+if __name__ == '__main__':
+    import numpy as np
+    input=Variable(torch.Tensor(np.random.uniform(size=(2, 3, 28, 28))))
+    d = ImageDiscriminator(3)
+    d(input)
 
-
-
-
-
+    ud = UnconstrainedImageDiscriminator(3)
+    d(input)
