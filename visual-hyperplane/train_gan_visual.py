@@ -20,31 +20,35 @@ from models import Generator, Discriminator
 resolutions = [32,64,128,256,512]
 
 parser = argparse.ArgumentParser(description='Train GAN on MILA-8')
-parser.add_argument('--datadir', help='path to image folder')
+
+# general learning
 parser.add_argument('--iterations', default=100000, type=int, help='iterations')
-parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient penalty')
-parser.add_argument('--double-sided', default=0, type=int, help='use double sided penalty vs single sided')
-parser.add_argument('--batch-size', default=64, type=int, help='minibatch size')
-parser.add_argument('--resolution', required=True, type=int, help='|'.join(map(str, resolutions)))
-parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
-parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
-parser.add_argument('--batchnorm', default=1, type=int, help='whether to use batchnorm')
-parser.add_argument('--latent', default=64, type=int, help='latent dimensions')
-parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
+parser.add_argument('--batch_size', default=64, type=int, help='minibatch size')
 parser.add_argument('--threads', default=8, type=int, help='number of threads for data loading')
 parser.add_argument('--logdir', required=True, help='where to log samples and models')
 parser.add_argument('--save-samples', default=100, type=int, help='save samples every')
 parser.add_argument('--save-models', default=1000, type=int, help='save models every')
 parser.add_argument('--log-every', default=100, type=int, help='log every N iterations')
-parser.add_argument('--sigma', default=0.1, type=float, help='vae gaussian bandwidth')
 parser.add_argument('--cuda', default=1, type=int, help='use cuda')
-parser.add_argument('--deform', default=1, type=int, help='do random deformations')
-parser.add_argument('--deform-alpha', default=8000., type=float, help='random deformation amplitude')
-parser.add_argument('--deform-sigma', default=70, type=int, help='random deformation bandwidth')
-parser.add_argument('--deform-cache', default=1000, type=int, help='random deformation cache')
-parser.add_argument('--deform-reuse', default=32, type=int, help='how many times to reuse each deformation')
+parser.add_argument('--validate-every', default=20, type=int, help='validate every N iterations')
 parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
-parser.add_argument('--validation', default=0.1, type=float, help='fraction of validation set')
+parser.add_argument('--random-seed', default=1234, type=int, help='random seed')
+parser.add_argument('--mnist', default='data', help='folder where MNIST is/will be downloaded')
+parser.add_argument('--sample-rows', default=10, type=int, help='how many samples in tensorboard')
+
+# task specific
+parser.add_argument('--amount', default=25, type=int, help='target to sum up to')
+parser.add_argument('--digits', default=5, type=int, help='how many digits per sequence')
+
+# WGAN-GP specific
+parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient penalty')
+parser.add_argument('--double-sided', default=0, type=int, help='use double sided penalty vs single sided')
+parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
+parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
+parser.add_argument('--batchnorm', default=1, type=int, help='whether to use batchnorm')
+parser.add_argument('--latent', default=64, type=int, help='latent dimensions')
+parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
+arser.add_argument('--sigma', default=0.1, type=float, help='vae gaussian bandwidth')
 
 args = parser.parse_args()
 print args
@@ -55,16 +59,6 @@ run_dir = '{}/gan-{}-{}-{}'.format(args.logdir, args.resolution, args.latent, da
 models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
-args.deform_size = args.resolution
-factor = args.deform_size / 256.
-alpha = args.deform_alpha * factor**2
-sigma = int(args.deform_sigma * factor)
-
-if args.deform_cache and args.deform:
-    elastic_deform_cached = ElasticDeformCached((args.deform_size, args.deform_size),
-                                                alpha,
-                                                sigma,
-                                                args.deform_cache)
 
 def get_gradient_penalty(netD, real_data, fake_data, double_sided, cuda):
     global gradients  # for debugging
@@ -103,73 +97,17 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided, cuda):
     return gradient_penalty
 
 
-# Create deformation cache
-def make_gray(data):
-    data = data.mean(2)
-    return data
-
-def deform(data):
-    if args.deform:
-        if args.deform_cache:
-            data = elastic_deform_cached.deform(data)
-        else:
-            data = elastic_deform(data, alpha, sigma, random_state=None)
-    return data
-
-def normalize(data, percentile=80):
-    '''
-    Push digit values close to 1, while background kept close to 0
-    '''
-    mask = data>0.
-    if not np.any(mask):
-        data_max = 1e-8
-    else:
-        data_max = np.percentile(data[mask], percentile)
-    data = np.clip(data / data_max, 0, 1)
-    return data
-
-def resize(img):
-    #img = scipy.misc.imresize(img, (args.resolution, args.resolution), interp='bicubic', mode='F')
-    img = scipy.misc.imresize(img, (args.resolution, args.resolution), interp='bilinear', mode='F')
-    return img
-
-# Load MILA8 dataset
-dataset = datasets.ImageFolder(args.datadir,
-                        transform=transforms.Compose([
-                            transforms.Scale(args.deform_size),
-                            # PIL image
-                            transforms.Lambda(lambda img: 1.-np.asarray(img)/255.),
-                            # Numpy 256 x 256 x 3
-                            transforms.Lambda(make_gray),
-                            # Numpy 256 x 256
-                            transforms.Lambda(deform),
-                            # Numpy args.resolution x args.resolution
-                            transforms.Lambda(normalize),
-                            transforms.Lambda(lambda img: torch.Tensor(img[np.newaxis]))
-                            # Torch 1 x args.resolution x args.resolution
-                        ]))
-dataset_len = len(dataset)
-train_limit = dataset_len - int(args.validation*dataset_len)
-train_loader = DataLoader(dataset, batch_size=args.batch_size,
-                          num_workers=args.threads,
-                          sampler=SubsetRandomSampler(range(0, train_limit)))
-test_loader = DataLoader(dataset, batch_size=args.batch_size,
-                          num_workers=args.threads,
-                          sampler=SubsetRandomSampler(range(train_limit, dataset_len)))
+full, train, test = get_full_train_test(args.amount, range(10), args.digits, one_hot=False, validation=0.8, seed=args.random_seed)
+train_visual = HyperplaneImageDataset(train, args.mnist, train=True)
+test_visual = HyperplaneImageDataset(test, args.mnist, train=False)
+train_loader = DataLoader(train_visual, batch_size=args.batch_size, shuffle=True)
+test_loader = DataLoader(test_visual, batch_size=args.batch_size, shuffle=True)
 def infinite_data(loader):
     while True:
         for data in loader:
             yield data
 train_iter = infinite_data(train_loader)
 test_iter = infinite_data(test_loader)
-
-# Recompute cache every ... ?
-if args.deform_reuse == 0:
-    recompute_cache_every = (len(dataset) * args.deform_cache / args.batch_size)
-else:
-    recompute_cache_every = args.deform_cache * args.deform_reuse / args.batch_size
-recompute_cache_every = max(1, recompute_cache_every)
-print 'Will recompute cache every {} iterations'.format(recompute_cache_every)
 
 # Prepare models
 netD = Discriminator(args.latent, args.resolution, False)
@@ -259,7 +197,6 @@ for iteration in tqdm(xrange(args.iterations)):
     log.add_scalar('wasserstein', Wasserstein_D.cpu().data.numpy(), iteration)
     log.add_scalar('gradientPenalty', gradient_penalty.cpu().data.numpy(), iteration)
 
-
     # Export samples to tensorboard
     if iteration % args.save_samples == 0:
         gallery_train = torchvision.utils.make_grid(real_data.data, normalize=True, range=(0,1))
@@ -267,6 +204,23 @@ for iteration in tqdm(xrange(args.iterations)):
         log.add_image('train', gallery_train, iteration)
         log.add_image('generation', gallery_gen, iteration)
         print 'Saving samples to tensorboard'
+
+    # Reconstructions
+    if iteration % args.save_samples == 0:
+        # Generate samples
+        samples = vae.generate(args.sample_rows, use_cuda=args.cuda)
+
+        # Process and log
+        view_train = view_samples(data.data, args.sample_rows)
+        view_gen = view_samples(samples.data, args.generate_samples)
+
+        gallery_train = torchvision.utils.make_grid(view_train,
+            nrow=args.digits, normalize=True, range=(0,1))
+        gallery_gen = torchvision.utils.make_grid(view_gen,
+            nrow=args.digits, normalize=True, range=(0,1))
+
+        log.add_image('train', gallery_train, iteration)
+        log.add_image('generation', gallery_gen, iteration)
 
     # Save models
     if iteration % args.save_models == 0:
