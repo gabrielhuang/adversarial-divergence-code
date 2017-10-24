@@ -44,13 +44,13 @@ parser.add_argument('--latent-local', default=10, type=int, help='local latent d
 parser.add_argument('--latent-global', default=64, type=int, help='global latent dimensions')
 parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
 parser.add_argument('--model-generator', default='constrained', help='constrained|unconstrained')
-parser.add_argument('--model-discriminator', default='constrained', help='constrained|unconstrained')
+parser.add_argument('--model-discriminator', default='constrained', help='constrained|unconstrained|semi')
 parser.add_argument('--unconstrained-size', default=32, type=int, help='size of disc/gen in unconstrained case')
 
 args = parser.parse_args()
 assert args.model_generator in ['constrained', 'unconstrained']
-assert args.model_discriminator in ['constrained', 'unconstrained']
-short = {'constrained': 'C', 'unconstrained': 'U'}
+assert args.model_discriminator in ['constrained', 'unconstrained', 'semi']
+short = {'constrained': 'C', 'unconstrained': 'U', 'semi': 'S'}
 print args
 
 date = time.strftime('%Y-%m-%d.%H%M')
@@ -152,6 +152,7 @@ optimizerG = Adam(netG.parameters(), lr=args.glr, betas=(0.5, 0.9))
 log = SummaryWriter(run_dir)
 print 'Writing logs to {}'.format(run_dir)
 
+nll_criterion = nn.NLLLoss()
 
 ######################
 # Main loop
@@ -169,7 +170,7 @@ for iteration in tqdm(xrange(args.iterations)):
 
     for iter_d in xrange(args.critic_iterations):
         # Real data
-        real_data, __ = train_iter.next()
+        real_data, real_labels = train_iter.next()
         if args.use_cuda:
             real_data = real_data.cuda()
         real_data = Variable(real_data)
@@ -190,10 +191,17 @@ for iteration in tqdm(xrange(args.iterations)):
         D_cost = D_fake - D_real + gradient_penalty
         Wasserstein_D = D_real - D_fake
 
+        if args.model_discriminator == 'semi':
+            prediction = netD.get_prediction()
+            ground_truth = real_labels.view(-1, 1)
+            classification_cost = nll_criterion(prediction, ground_truth)
+            D_cost += classification_cost
+
         # Train D but not G
         netD.zero_grad()
         D_cost.backward()
         optimizerD.step()
+
 
     ############################
     # (2) Update G network
@@ -222,6 +230,7 @@ for iteration in tqdm(xrange(args.iterations)):
     log.add_scalar('generatorCost', G_cost.cpu().data.numpy(), iteration)
     log.add_scalar('wasserstein', Wasserstein_D.cpu().data.numpy(), iteration)
     log.add_scalar('gradientPenalty', gradient_penalty.cpu().data.numpy(), iteration)
+    log.add_scalar('semiSupervisedCost', classification_cost.cpu().data.numpy(), iteration)
 
     # Reconstructions
     if iteration % args.save_samples == 0:

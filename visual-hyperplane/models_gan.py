@@ -287,6 +287,42 @@ class UnconstrainedImageDiscriminator(nn.Module):
         return out.view(-1, 1)
 
 
+class SemiSupervisedImageDiscriminator(nn.Module):
+    def __init__(self, nb_digits, size=32):
+        nn.Module.__init__(self)
+        self.nb_digits = nb_digits
+        self.size = size
+        self.sizes = [
+            [nb_digits, None, None, None],
+            # 28 x 28 - nb_digits
+            [size*1, 4, 2, 1],
+            # 14 x 14 - size
+            [size*2, 4, 2, 2],
+            # 8 x 8 - size*2
+            [size*4, 4, 2, 1],
+            # 4 x 4 - size*4
+            [size*8, 4, 1, 0],
+            # 1 x 1 - size*8
+        ]
+        self.main = nn.Sequential(
+            *build_cnn(self.sizes, batchnorm=False, deconv=False)
+        )
+        self.discriminator_output = nn.Linear(size*8, 1)
+        self.classifier_output = nn.Linear(size*8, nb_digits*10)
+
+    def forward(self, input):
+        out = self.main(input)
+        out = self.discriminator_output(out)
+        c_out = self.classifier_output(out)
+        c_out = c_out.view(-1, 10)
+        c_out = F.logsoftmax(c_out)
+        self.c_out = c_out
+        return out.view(-1, 1)
+
+    def get_prediction(self):
+        return self.c_out
+
+
 if __name__ == '__main__':
     import numpy as np
     input=Variable(torch.Tensor(np.random.uniform(size=(2, 3, 28, 28))))
