@@ -133,8 +133,10 @@ for iteration in tqdm(xrange(args.iterations)):
         view_rec = view_samples(r_data.data, args.sample_rows)
         view_train = view_samples(data.data, args.sample_rows)
 
-        gallery_rec = torchvision.utils.make_grid(view_rec, nrow=len(r_data), normalize=True, range=(0,1))
-        gallery_train = torchvision.utils.make_grid(view_train, nrow=len(data), normalize=True, range=(0,1))
+        gallery_rec = torchvision.utils.make_grid(view_rec,
+            nrow=args.digits, normalize=True, range=(0,1))
+        gallery_train = torchvision.utils.make_grid(view_train,
+            nrow=args.digits, normalize=True, range=(0,1))
         log.add_image('train', gallery_train, iteration)
         log.add_image('reconstruction', gallery_rec, iteration)
 
