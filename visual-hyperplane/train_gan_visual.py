@@ -225,7 +225,7 @@ for iteration in tqdm(xrange(args.iterations)):
 
         # Process and log
         view_train = view_samples(real_data.data, args.sample_rows)
-        view_gen = view_samples(samples.data, args.generate_samples)
+        view_gen = view_samples(samples.data, args.sample_rows)
 
         gallery_train = torchvision.utils.make_grid(view_train, nrow=args.nb_digits, normalize=True, range=(0, 1))
         gallery_gen = torchvision.utils.make_grid(view_gen, nrow=args.nb_digits, normalize=True, range=(0, 1))
