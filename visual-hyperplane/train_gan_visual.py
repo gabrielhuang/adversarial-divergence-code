@@ -127,7 +127,7 @@ if args.model_discriminator == 'unconstrained':
 else:
     netD = ImageDiscriminator(args.nb_digits)
 if args.model_generator == 'unconstrained':
-    netG = UnconstrainedImageGenerator(args.latent_global, args.nb_digita)
+    netG = UnconstrainedImageGenerator(args.latent_global, args.nb_digits)
 else:
     netG = ImageGenerator(args.latent_global, args.latent_local, args.nb_digits)
 
