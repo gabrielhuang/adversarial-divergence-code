@@ -90,7 +90,7 @@ def view_samples(data, max_samples=None):
     if max_samples:
         data = data[:min(max_samples, len(data))]
     size = data.size()
-    return data.view(-1, 1, size[-2], size[-1]) 
+    return data.view(-1, 1, size[-2], size[-1])
 
 # Actual training
 losses = []
@@ -127,15 +127,18 @@ for iteration in tqdm(xrange(args.iterations)):
         view_rec = view_samples(r_data.data, args.sample_rows)
         view_train = view_samples(data.data, args.sample_rows)
 
-        gallery_rec = torchvision.utils.make_grid(view_rec, nrow=len(r_data), normalize=True, range=(0,1))
-        gallery_train = torchvision.utils.make_grid(view_train, nrow=len(data), normalize=True, range=(0,1))
+        gallery_rec = torchvision.utils.make_grid(view_rec,
+            nrow=args.digits, args.sample_rows), normalize=True, range=(0,1))
+        gallery_train = torchvision.utils.make_grid(view_train,
+            nrow=args.digits, args.sample_rows), normalize=True, range=(0,1))
         log.add_image('train', gallery_train, iteration)
         log.add_image('reconstruction', gallery_rec, iteration)
 
         # Generate 100 images
         samples = vae.generate(args.sample_rows, use_cuda=args.cuda)
         view_gen = view_samples(samples.data, args.generate_samples)
-        gallery_gen = torchvision.utils.make_grid(view_gen, nrow=len(samples), normalize=True, range=(0,1))
+        gallery_gen = torchvision.utils.make_grid(view_gen,
+            nrow=args.digits, normalize=True, range=(0,1))
         log.add_image('generation', gallery_gen, iteration)
 
     # Models
