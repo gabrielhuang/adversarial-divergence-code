@@ -55,8 +55,8 @@ short = {'constrained': 'C', 'unconstrained': 'U', 'semi': 'S'}
 print args
 
 date = time.strftime('%Y-%m-%d.%H%M')
-run_dir = '{}/gan-d{}g{}-{}'.format(args.logdir, short[args.model_generator],
-                                short[args.model_discriminator], date)
+run_dir = '{}/gan-d{}g{}-{}'.format(args.logdir, short[args.model_discriminator],
+                                short[args.model_generator], date)
 # Create models dir if deosnt exist
 models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
