@@ -176,7 +176,9 @@ for iteration in tqdm(xrange(args.iterations)):
         real_data, real_labels = train_iter.next()
         if args.use_cuda:
             real_data = real_data.cuda()
+            real_labels = real_labels.cuda()
         real_data = Variable(real_data)
+        real_labels = Variable(real_labels)
         if len(real_data) != args.batch_size:
             # the last batch might be smaller, skip it
             continue
@@ -195,10 +197,9 @@ for iteration in tqdm(xrange(args.iterations)):
         Wasserstein_D = D_real - D_fake
 
         if args.model_discriminator == 'semi':
-            import pdb
-            pdb.set_trace()
+            #import pdb pdb.set_trace()
             prediction = netD.get_prediction()
-            ground_truth = real_labels.view(-1, 1)
+            ground_truth = real_labels.view(-1)
             classification_cost = nll_criterion(prediction, ground_truth)
             D_cost += classification_cost
 
