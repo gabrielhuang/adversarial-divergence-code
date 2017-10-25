@@ -202,6 +202,10 @@ for iteration in tqdm(xrange(args.iterations)):
             ground_truth = real_labels.view(-1)
             classification_cost = nll_criterion(prediction, ground_truth)
             D_cost += classification_cost
+            indices = np.argmax(prediction.cpu().numpy(), axis=1)
+            accuracy = (indices == ground_truth.data.cpu().numpy()).mean()
+            log.add_scalar('semiSupervisedCost', classification_cost.cpu().data.numpy(), iteration)
+            log.add_scalar('semiSupervisedAccuracy', classification_cost.cpu().data.numpy(), iteration)
 
         # Train D but not G
         netD.zero_grad()
@@ -236,7 +240,6 @@ for iteration in tqdm(xrange(args.iterations)):
     log.add_scalar('generatorCost', G_cost.cpu().data.numpy(), iteration)
     log.add_scalar('wasserstein', Wasserstein_D.cpu().data.numpy(), iteration)
     log.add_scalar('gradientPenalty', gradient_penalty.cpu().data.numpy(), iteration)
-    log.add_scalar('semiSupervisedCost', classification_cost.cpu().data.numpy(), iteration)
 
     # Reconstructions
     if iteration % args.save_samples == 0:
