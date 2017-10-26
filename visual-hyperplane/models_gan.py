@@ -207,7 +207,7 @@ class ImageGenerator(nn.Module):
 
 
 class ImageDiscriminator(nn.Module):
-    def __init__(self, nb_digits):
+    def __init__(self, nb_digits, use_js=False):
         nn.Module.__init__(self)
         self.nb_digits = nb_digits
         self.conv_sizes = [
@@ -231,6 +231,8 @@ class ImageDiscriminator(nn.Module):
             [128, 1]
         ]
         self.mlp_modules = build_mlp(self.mlp_sizes, batchnorm=False)[:-1]
+        if use_js:
+            self.mlp_modules.append(nn.Sigmoid())
         self.mlp = nn.Sequential(
             *self.mlp_modules
         )

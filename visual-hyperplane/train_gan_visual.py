@@ -47,10 +47,13 @@ parser.add_argument('--critic-iterations', default=5, type=int, help='number of 
 parser.add_argument('--model-generator', default='constrained', help='constrained|unconstrained')
 parser.add_argument('--model-discriminator', default='constrained', help='constrained|unconstrained|semi')
 parser.add_argument('--unconstrained-size', default=32, type=int, help='size of disc/gen in unconstrained case')
+parser.add_argument('--dragan', default=1, type=int, help='use dragan')
+parser.add_argument('--dragan-noise', default=0.1, type=float, help='dragan noise')
 
 args = parser.parse_args()
 assert args.model_generator in ['constrained', 'unconstrained']
 assert args.model_discriminator in ['constrained', 'unconstrained', 'semi']
+assert (not args.dragan) or (args.model_discriminator == 'constrained')
 short = {'constrained': 'C', 'unconstrained': 'U', 'semi': 'S'}
 print args
 
@@ -88,10 +91,14 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided, cuda):
     if cuda:
         alpha = alpha.cuda()
 
-    interpolates_flat = alpha*real_flat + (1-alpha)*fake_flat
+    if not args.dragan:
+        interpolates_flat = alpha*real_flat + (1-alpha)*fake_flat
+    else:
+        noise = torch.randn(real_flat.size()[0], real_flat.size()[1])
+        interpolates_flat = real_flat + args.dragan_noise * noise
+
     interpolates_flat = Variable(interpolates_flat, requires_grad=True)
     interpolates = interpolates_flat.view(*real_data.size())
-
     D_interpolates = netD(interpolates)
 
     ones = torch.ones(D_interpolates.size())
@@ -133,7 +140,7 @@ test_iter = infinite_data(test_loader)
 if args.model_discriminator == 'unconstrained':
     netD = UnconstrainedImageDiscriminator(args.nb_digits, args.unconstrained_size)
 elif args.model_discriminator == 'constrained':
-    netD = ImageDiscriminator(args.nb_digits)
+    netD = ImageDiscriminator(args.nb_digits, use_js=args.dragan)
 elif args.model_discriminator == 'semi':
     netD = SemiSupervisedImageDiscriminator(args.nb_digits)
 if args.model_generator == 'unconstrained':
@@ -193,7 +200,10 @@ for iteration in tqdm(xrange(args.iterations)):
         # Costs
         gradient_penalty = args.penalty * get_gradient_penalty(
             netD, real_data.data, fake_data.data, double_sided=args.double_sided, cuda=args.use_cuda)
-        D_cost = D_fake - D_real + gradient_penalty
+        if args.dragan:
+            D_cost = -torch.log(1-D_fake) - torch.log(D_real) + gradient_penalty
+        else:
+            D_cost = D_fake - D_real + gradient_penalty
         Wasserstein_D = D_real - D_fake
 
         if args.model_discriminator == 'semi':
@@ -227,7 +237,10 @@ for iteration in tqdm(xrange(args.iterations)):
     D_fake = netD(fake_data).mean()
 
     # Costs
-    G_cost = -D_fake
+    if args.dragan:
+        G_cost = torch.log(D_fake)
+    else:
+        G_cost = -D_fake
 
     # Train G but not D
     netG.zero_grad()
