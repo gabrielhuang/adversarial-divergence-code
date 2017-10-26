@@ -6,6 +6,7 @@ import torchvision
 import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn.functional as F
+from tqdm import tqdm
 
 nb_epochs = 70
 batch_size = 1000
@@ -44,7 +45,7 @@ classifier.eval()
 digits_list = []
 softmax_list = []
 
-for i in xrange(nb_epochs):
+for i in tqdm(xrange(nb_epochs)):
     samples = netG.generate(batch_size, use_cuda=use_cuda)
     size = samples.size()
     samples = samples.view(-1, 1, size[-2], size[-1])
