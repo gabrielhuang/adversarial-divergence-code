@@ -230,8 +230,9 @@ class ImageDiscriminator(nn.Module):
             [128, 128],
             [128, 1]
         ]
+        self.mlp_modules = build_mlp(self.mlp_sizes, batchnorm=False)[:-1]
         self.mlp = nn.Sequential(
-            *build_mlp(self.mlp_sizes, batchnorm=False)
+            *self.mlp_modules
         )
 
     def forward(self, input):
