@@ -27,43 +27,47 @@ def build_cnn(sizes, batchnorm=True, deconv=False):
                 nn.ReLU(True))
     return modules
 
-
 class VAE(nn.Module):
     def __init__(self, n_digits, latent=50, batchnorm=True, activation=F.relu):
         super(VAE, self).__init__()
         self.latent = latent
         self.n_digits = n_digits
 
-        if batchnorm:
-            self.activation = lambda x: F.batch_norm(activation(x))
-        else:
-            self.activation = activation
+        self.activation = activation
 
-        self.enc1 = nn.Conv2d(1,8,4,2,1) #8x14x14
-        self.enc2 = nn.Conv2d(8,16,4,2,2) #16x8x8
-        self.enc3 = nn.Conv2d(16,32,4,2,1) #32x4x4
-        self.enc4 = nn.Conv2d(32,32,4,2,0) #32x1x1
-        self.enc5 = nn.Linear(32*self.n_digits, 200)
-        self.enc6 = nn.Linear(200, 200)
-        self.enc_mu = nn.Linear(200, self.latent)
-        self.enc_sigma = nn.Linear(200, self.latent)
+        self.enc1 = nn.Conv2d(1,64,4,2,1) #8x14x14
+        self.enc1_bn = nn.BatchNorm2d(64)
+        self.enc2 = nn.Conv2d(64,64,4,2,2) #16x8x8
+        self.enc2_bn = nn.BatchNorm2d(64)
+        self.enc3 = nn.Conv2d(64,128,4,2,1) #32x4x4
+        self.enc3_bn = nn.BatchNorm2d(128)
+        self.enc4 = nn.Conv2d(128,100,4,2,0) #32x1x1
+        self.enc4_bn = nn.BatchNorm2d(100)
+        self.enc5 = nn.Linear(100*self.n_digits, 256)
+        self.enc6 = nn.Linear(256, 256)
+        self.enc_mu = nn.Linear(256, self.latent)
+        self.enc_sigma = nn.Linear(256, self.latent)
 
-        self.dec1 = nn.Linear(self.latent, 200)
-        self.dec2 = nn.Linear(200, 200)
-        self.dec3 = nn.Linear(200, 32*n_digits)
-        self.dec4 = nn.ConvTranspose2d(32,32,4,1,0) #32x4x4
-        self.dec5 = nn.ConvTranspose2d(32,16,4,2,1) #16x8x8
-        self.dec6 = nn.ConvTranspose2d(16,8,4,2,2) #8x14x14
-        self.dec7 = nn.ConvTranspose2d(8,4,4,2,1) #4x28x28
-        self.dec_mu = nn.ConvTranspose2d(4,1,1) #1x28x28
-        self.dec_sigma = nn.ConvTranspose2d(4,1,1) #1x28x28
+        self.dec1 = nn.Linear(self.latent, 128)
+        self.dec2 = nn.Linear(128, 128)
+        self.dec3 = nn.Linear(128, 100*n_digits)
+        self.dec4 = nn.ConvTranspose2d(100,128,4,1,0) #32x4x4
+        self.dec4_bn = nn.BatchNorm2d(128)
+        self.dec5 = nn.ConvTranspose2d(128,128,4,2,1) #16x8x8
+        self.dec5_bn = nn.BatchNorm2d(128)
+        self.dec6 = nn.ConvTranspose2d(128,64,4,2,2) #8x14x14
+        self.dec6_bn = nn.BatchNorm2d(64)
+        self.dec7 = nn.ConvTranspose2d(64,64,4,2,1) #4x28x28
+        self.dec7_bn = nn.BatchNorm2d(64)
+        self.dec_mu = nn.ConvTranspose2d(64,1,1) #1x28x28
+        self.dec_sigma = nn.ConvTranspose2d(64,1,1) #1x28x28
 
 
     def encode(self, x):
-        z = self.activation(self.enc1(x.view(-1,1,28,28)))
-        z = self.activation(self.enc2(z))
-        z = self.activation(self.enc3(z))
-        z = self.activation(self.enc4(z)).view(-1,self.n_digits*32)
+        z = self.activation(self.enc1_bn(self.enc1(x.view(-1,1,28,28))))
+        z = self.activation(self.enc2_bn(self.enc2(z)))
+        z = self.activation(self.enc3_bn(self.enc3(z)))
+        z = self.activation(self.enc4_bn(self.enc4(z))).view(-1,self.n_digits*100)
         z = self.activation(self.enc5(z))
         z = self.activation(self.enc6(z))
         z_mu = self.enc_mu(z)
@@ -84,10 +88,10 @@ class VAE(nn.Module):
         z = self.activation(self.dec2(z))
         z = self.activation(self.dec3(z))
 
-        x = self.activation(self.dec4(z.view(-1,32,1,1)))
-        x = self.activation(self.dec5(x))
-        x = self.activation(self.dec6(x))
-        x = self.activation(self.dec7(x))
+        x = self.activation(self.dec4_bn(self.dec4(z.view(-1,100,1,1))))
+        x = self.activation(self.dec5_bn(self.dec5(x)))
+        x = self.activation(self.dec6_bn(self.dec6(x)))
+        x = self.activation(self.dec7_bn(self.dec7(x)))
         x_mu = F.sigmoid(self.dec_mu(x))
         #x_logvar = self.dec_sigma(x)
 
@@ -122,26 +126,22 @@ class UnconstrainedVAE(nn.Module):
         self.encoder_sizes = [
             [n_digits, None, None, None],
             # 28 x 28 - n_digits
-            [64, 4, 2, 1],
+            [32, 4, 2, 1],
             # 14 x 14 - 128
-            [128, 4, 2, 2],
+            [64, 4, 2, 2],
             # 8 x 8 - 128
             [128, 4, 2, 1],
             # 4 x 4 - 128
-            [128, 4, 1, 0],
-            # 1 x 1 - 128
         ]
 
         self.decoder_sizes = [
-            [latent, None, None, None],
-            # 1 x 1 - latent
-            [128, 4, 1, 0],
+            [128, None, None, None],
             # 4 x 4 - 128
-            [128, 4, 2, 1],
+            [64, 4, 2, 1],
             # 8 x 8 - 128
-            [64, 4, 2, 2],
+            [32, 4, 2, 2],
             # 14 x 14 - 128
-            [n_digits, 4, 2, 1],
+            [16, 4, 2, 1],
             # 28 x 28 - n_digits
         ]
 
@@ -153,8 +153,12 @@ class UnconstrainedVAE(nn.Module):
         self.encoder = nn.Sequential(*self.encoder_modules)
 
         # Mean and covariance from encoder output
-        self.to_mean = nn.Conv2d(self.encoder_sizes[-1][0], self.latent, 1, 1, 0)
-        self.to_cov = nn.Conv2d(self.encoder_sizes[-1][0], self.latent, 1, 1, 0)
+        #self.to_mean = nn.Conv2d(self.encoder_sizes[-1][0], self.latent, 1, 1, 0)
+        #self.to_cov = nn.Conv2d(self.encoder_sizes[-1][0], self.latent, 1, 1, 0)
+        self.enc_1 = nn.Linear(128*4*4, 100)
+        self.enc_2 = nn.Linear(100, 100)
+        self.to_mean = nn.Linear(100, self.latent)
+        self.to_cov = nn.Linear(100, self.latent)
         # 1 x 1 - latent
 
         # Build decoder
@@ -165,10 +169,14 @@ class UnconstrainedVAE(nn.Module):
         # so everything will be centered but positive
         self.decoder_modules += [nn.ReLU(True)]
         self.decoder = nn.Sequential(*self.decoder_modules)
+        self.dec_1 = nn.Linear(self.latent, 128*4*4)
+        self.dec_mu = nn.Conv2d(self.decoder_sizes[-1][0], self.n_digits, 1,1,0)
 
     def encode(self, x):
         h = self.encoder(x)
-        return self.to_mean(h), self.to_cov(h)
+        h = F.relu(self.enc_1(h.view(-1, 128*4*4)))
+        h = F.relu(self.enc_2(h))
+        return self.to_mean(h).view(-1,self.latent,1,1), self.to_cov(h).view(-1,self.latent,1,1)
 
     def reparameterize(self, mu, logvar):
         if self.training:
@@ -179,7 +187,9 @@ class UnconstrainedVAE(nn.Module):
           return mu
 
     def decode(self, z):
-        return self.decoder(z)
+        x = F.relu(self.dec_1(z.view(-1,self.latent)))
+        x = self.decoder(x.view(-1,128,4,4))
+        return self.dec_mu(x)
 
     def forward(self, x):
         mu, logvar = self.encode(x)
