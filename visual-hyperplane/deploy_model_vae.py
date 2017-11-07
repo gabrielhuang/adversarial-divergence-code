@@ -1,21 +1,18 @@
-
 import json
-from models_gan import ImageGenerator, UnconstrainedImageGenerator, MNISTNet
+from models_gan import MNISTNet
 from models import VAE
 import torch
 import torchvision
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn.functional as F
 from tqdm import tqdm
 
-nb_epochs = 70
+nb_epochs = 5
+#nb_epochs = 70
 batch_size = 1000
 use_cuda = 1
 
-models_dir = '/checkpoint/hberard/vae_hypersample/vae-200-2017-10-26.0113/models'
+models_dir = 'trained_models/'
 output_dir = 'results'
 epoch = 99000
 ndigits = 5
