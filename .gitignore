@@ -2,3 +2,6 @@
 *.swp
 .DS_Store
 .ipynb_checkpoints/
+.*swn
+.*swo
+.*swl
