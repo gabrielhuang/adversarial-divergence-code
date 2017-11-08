@@ -17,10 +17,8 @@ baseline_sum = samples.sum(axis=1)
 x_baseline, height_baseline = np.unique(baseline_sum, return_counts=True)
 height_baseline = height_baseline/float(len(baseline_sum)) * 100
 
-
-models_dir = 'trained_models'
-vae_digits_filename = '{}/vae_digits.npy'.format(models_dir)
-gan_digits_filename = '{}/gan_digits.npy'.format(models_dir)
+vae_digits_filename = 'results-vae/digits.npy'
+gan_digits_filename = 'results-gan/digits.npy'
 
 vae_digits = np.load(vae_digits_filename)
 gan_digits = np.load(gan_digits_filename)
