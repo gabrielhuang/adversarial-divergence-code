@@ -11,7 +11,7 @@ flat_dataset = np.array(full_dataset.hyperplane_dataset.combinations).flatten()
 digits, freq = np.unique(flat_dataset, return_counts=True)
 freq = freq / float(len(flat_dataset))
 
-samples = np.random.choice(digits, size=(nb_samples, 5), p=freq)
+base_digits = samples = np.random.choice(digits, size=(nb_samples, 5), p=freq)
 baseline_sum = samples.sum(axis=1)
 
 x_baseline, height_baseline = np.unique(baseline_sum, return_counts=True)
@@ -62,6 +62,8 @@ l_vae_train = []
 l_vae_test = []
 l_gan_train = []
 l_gan_test = []
+l_base_train = []
+l_base_test = []
 for sample_ratio in np.linspace(0, 1, 10):
     N = min(len(vae_digits), len(gan_digits))
     n_samples = max(1, min(int(sample_ratio*N), N))
@@ -74,14 +76,25 @@ for sample_ratio in np.linspace(0, 1, 10):
     recall_gan_train = get_recall(gan_digits[:n_samples], train_dataset)
     recall_gan_test = get_recall(gan_digits[:n_samples], test_dataset)
 
+    recall_base_full = get_recall(base_digits[:n_samples], full_dataset)
+    recall_base_train = get_recall(base_digits[:n_samples], train_dataset)
+    recall_base_test = get_recall(base_digits[:n_samples], test_dataset)
+
     # accumulate
     l_samples.append(n_samples)
     l_vae_train.append(recall_vae_train)
     l_vae_test.append(recall_vae_test)
     l_gan_train.append(recall_gan_train)
     l_gan_test.append(recall_gan_test)
+    l_base_train.append(recall_base_train)
+    l_base_test.append(recall_base_test)
 
 print 'n_samples', n_samples
+
+print 'Baseline recalls:'
+print '\tfull', recall_base_full
+print '\ttrain', recall_base_train
+print '\ttest', recall_base_test
 
 print 'VAE recalls:'
 print '\tfull', recall_vae_full
@@ -92,6 +105,7 @@ print 'GAN recalls:'
 print '\tfull', recall_gan_full
 print '\ttrain', recall_gan_train
 print '\ttest', recall_gan_test
+
 
 # Make actual figure
 plt.figure()
@@ -106,8 +120,13 @@ plt.rcParams.update(params)
 
 plt.plot(l_samples, l_gan_test, '-o', alpha=0.6, color='green', label='GAN (test)')
 plt.plot(l_samples, l_gan_train, '-o', alpha=0.6, color='green', label='GAN (train)', linestyle='--')
+
 plt.plot(l_samples, l_vae_test, '-o', alpha=0.6, color='red', label='VAE (test)')
 plt.plot(l_samples, l_vae_train, '-o', alpha=0.6, color='red', label='VAE (train)', linestyle='--')
+
+plt.plot(l_samples, l_base_test, '-o', alpha=0.6, color='gray', label='Indep. baseline (test)')
+plt.plot(l_samples, l_base_train, '-o', alpha=0.6, color='gray', label='Indep. baseline (train)', linestyle='--')
+
 plt.xlabel('samples generated')
 plt.ylabel('recall')
 plt.legend(loc='best')
