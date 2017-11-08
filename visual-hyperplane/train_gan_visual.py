@@ -40,7 +40,6 @@ parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient p
 parser.add_argument('--double-sided', default=0, type=int, help='use double sided penalty vs single sided')
 parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
 parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
-parser.add_argument('--batchnorm', default=1, type=int, help='whether to use batchnorm')
 parser.add_argument('--latent-local', default=10, type=int, help='local latent dimensions for each image')
 parser.add_argument('--latent-global', default=64, type=int, help='global latent dimensions')
 parser.add_argument('--critic-iterations', default=5, type=int, help='number of critic iterations')
