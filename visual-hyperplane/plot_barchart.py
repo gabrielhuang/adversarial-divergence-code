@@ -39,7 +39,7 @@ width = 0.30
 plt.clf()
 plt.rcParams['text.latex.preamble'] = [r"\usepackage{lmodern}"]
 params = {'text.usetex': True,
-          'font.size': 10,
+          'font.size': 15,
           'font.family': 'lmodern',
           'text.latex.unicode': True,
           }
