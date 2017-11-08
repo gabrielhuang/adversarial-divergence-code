@@ -30,6 +30,9 @@ def build_cnn(sizes, batchnorm=True, deconv=False):
 class VAE(nn.Module):
     def __init__(self, n_digits, latent=50, batchnorm=True, activation=F.relu):
         super(VAE, self).__init__()
+
+        assert batchnorm == True, 'batchnorm has to be true'
+
         self.latent = latent
         self.n_digits = n_digits
 

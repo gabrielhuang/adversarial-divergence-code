@@ -39,7 +39,6 @@ parser.add_argument('--amount', default=25, type=int, help='target to sum up to'
 parser.add_argument('--digits', default=5, type=int, help='how many digits per sequence')
 
 # VAE specific
-parser.add_argument('--batchnorm', default=1, type=int, help='whether to use batchnorm')
 parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
 parser.add_argument('--latent', default=64, type=int, help='latent dimensions')
 parser.add_argument('--sigma', default=0.1, type=float, help='vae gaussian bandwidth')
@@ -71,9 +70,9 @@ test_iter = infinite_data(test_loader)
 
 # Prepare models
 if args.model == 'unconstrained':
-    vae = UnconstrainedVAE(args.latent, args.digits, batchnorm=args.batchnorm)
+    vae = UnconstrainedVAE(args.latent, args.digits, batchnorm=True)
 elif args.model == 'constrained':
-    vae = VAE(args.digits, args.latent, batchnorm=False)
+    vae = VAE(args.digits, args.latent, batchnorm=True)
 else:
     raise ValueError('Model not specified.')
 if args.cuda:
