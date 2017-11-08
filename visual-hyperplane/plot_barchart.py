@@ -37,7 +37,7 @@ width = 0.30
 plt.clf()
 plt.rcParams['text.latex.preamble'] = [r"\usepackage{lmodern}"]
 params = {'text.usetex': True,
-          'font.size': 15,
+          'font.size': 10,
           'font.family': 'lmodern',
           'text.latex.unicode': True,
           }
@@ -49,6 +49,7 @@ plt.bar(x_baseline + 2*width, height_baseline, width=width, alpha=0.6, color='gr
 plt.xlabel('sum of digits')
 plt.ylabel('$\%$ frequency')
 plt.legend(loc='best')
+plt.xticks([0,10,20,25,30,40], ['0','10','20', r'\textbf{25}','30','40'])
 plt.savefig('sum_digits_dist.pdf')
 
 # RECALL
@@ -112,7 +113,7 @@ plt.figure()
 plt.clf()
 plt.rcParams['text.latex.preamble'] = [r"\usepackage{lmodern}"]
 params = {'text.usetex': True,
-          'font.size': 15,
+          'font.size': 10,
           'font.family': 'lmodern',
           'text.latex.unicode': True,
           }
