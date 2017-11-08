@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from hyperplane_dataset import generate_hyperplane_dataset
+from hyperplane_dataset import get_full_train_test
 
+full_dataset, train_dataset, test_dataset = get_full_train_test(25, range(10), 5, one_hot=False, validation=0.8, seed=1234)
 
 # generate baseline samples
 nb_samples = 70000
-full_dataset = generate_hyperplane_dataset(25, range(10), 5, False)
-flat_dataset = np.array(full_dataset.combinations).flatten()
+flat_dataset = np.array(full_dataset.hyperplane_dataset.combinations).flatten()
 
 digits, freq = np.unique(flat_dataset, return_counts=True)
 freq = freq / float(len(flat_dataset))
@@ -50,3 +50,27 @@ plt.xlabel('sum of digits')
 plt.ylabel('$\%$ frequency')
 plt.legend(loc='best')
 plt.savefig('sum_digits_dist.pdf')
+
+# RECALL
+def get_recall(samples, dataset):
+    intersection = [tuple(c) for c in samples if tuple(c) in dataset.set]
+    unique = set(intersection)
+    return len(unique) / float(len(dataset))
+
+recall_vae_full = get_recall(vae_digits, full_dataset)
+recall_vae_train = get_recall(vae_digits, train_dataset)
+recall_vae_test = get_recall(vae_digits, test_dataset)
+
+recall_gan_full = get_recall(gan_digits, full_dataset)
+recall_gan_train = get_recall(gan_digits, train_dataset)
+recall_gan_test = get_recall(gan_digits, test_dataset)
+
+print 'VAE recalls:'
+print '\tfull', recall_vae_full
+print '\ttrain', recall_vae_train
+print '\ttest', recall_vae_test
+
+print 'GAN recalls:'
+print '\tfull', recall_gan_full
+print '\ttrain', recall_gan_train
+print '\ttest', recall_gan_test
