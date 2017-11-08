@@ -57,13 +57,31 @@ def get_recall(samples, dataset):
     unique = set(intersection)
     return len(unique) / float(len(dataset))
 
-recall_vae_full = get_recall(vae_digits, full_dataset)
-recall_vae_train = get_recall(vae_digits, train_dataset)
-recall_vae_test = get_recall(vae_digits, test_dataset)
+l_samples = []
+l_vae_train = []
+l_vae_test = []
+l_gan_train = []
+l_gan_test = []
+for sample_ratio in np.linspace(0, 1, 10):
+    N = min(len(vae_digits), len(gan_digits))
+    n_samples = max(1, min(int(sample_ratio*N), N))
 
-recall_gan_full = get_recall(gan_digits, full_dataset)
-recall_gan_train = get_recall(gan_digits, train_dataset)
-recall_gan_test = get_recall(gan_digits, test_dataset)
+    recall_vae_full = get_recall(vae_digits[:n_samples], full_dataset)
+    recall_vae_train = get_recall(vae_digits[:n_samples], train_dataset)
+    recall_vae_test = get_recall(vae_digits[:n_samples], test_dataset)
+
+    recall_gan_full = get_recall(gan_digits[:n_samples], full_dataset)
+    recall_gan_train = get_recall(gan_digits[:n_samples], train_dataset)
+    recall_gan_test = get_recall(gan_digits[:n_samples], test_dataset)
+
+    # accumulate
+    l_samples.append(n_samples)
+    l_vae_train.append(recall_vae_train)
+    l_vae_test.append(recall_vae_test)
+    l_gan_train.append(recall_gan_train)
+    l_gan_test.append(recall_gan_test)
+
+print 'n_samples', n_samples
 
 print 'VAE recalls:'
 print '\tfull', recall_vae_full
@@ -74,3 +92,24 @@ print 'GAN recalls:'
 print '\tfull', recall_gan_full
 print '\ttrain', recall_gan_train
 print '\ttest', recall_gan_test
+
+# Make actual figure
+plt.figure()
+plt.clf()
+plt.rcParams['text.latex.preamble'] = [r"\usepackage{lmodern}"]
+params = {'text.usetex': True,
+          'font.size': 15,
+          'font.family': 'lmodern',
+          'text.latex.unicode': True,
+          }
+plt.rcParams.update(params)
+
+plt.plot(l_samples, l_gan_test, '-o', alpha=0.6, color='green', label='GAN (test)')
+plt.plot(l_samples, l_gan_train, '-o', alpha=0.6, color='green', label='GAN (train)', linestyle='--')
+plt.plot(l_samples, l_vae_test, '-o', alpha=0.6, color='red', label='VAE (test)')
+plt.plot(l_samples, l_vae_train, '-o', alpha=0.6, color='red', label='VAE (train)', linestyle='--')
+plt.xlabel('samples generated')
+plt.ylabel('recall')
+plt.legend(loc='best')
+plt.savefig('recall.pdf')
+
