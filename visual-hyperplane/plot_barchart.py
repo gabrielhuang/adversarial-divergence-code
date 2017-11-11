@@ -91,6 +91,7 @@ for sample_ratio in np.linspace(0, 1, 10):
     l_gan_test.append(recall_gan_test)
     l_base_train.append(recall_base_train)
     l_base_test.append(recall_base_test)
+l_samples = np.asarray(l_samples)
 
 print 'n_samples', n_samples
 
@@ -134,4 +135,33 @@ plt.xlabel('samples generated')
 plt.ylabel('recall')
 plt.legend(loc='best')
 plt.savefig('recall.pdf')
+
+# Make actual figure
+plt.figure()
+plt.clf()
+plt.rcParams['text.latex.preamble'] = [r"\usepackage{lmodern}"]
+params = {'text.usetex': True,
+          'font.size': 10,
+          'font.family': 'lmodern',
+          'text.latex.unicode': True,
+          }
+plt.rcParams.update(params)
+
+train_ratio = l_samples / float(len(train_dataset))
+test_ratio = l_samples / float(len(test_dataset))
+train_alpha = 0.3
+plt.plot(test_ratio, l_gan_test, '-', alpha=0.6, color='green', label='GAN (test)')
+plt.plot(train_ratio, l_gan_train, '-', alpha=train_alpha, color='green', label='GAN (train)', linestyle='--')
+
+plt.plot(test_ratio, l_vae_test, '-', alpha=0.6, color='red', label='VAE (test)')
+plt.plot(train_ratio, l_vae_train, '-', alpha=train_alpha, color='red', label='VAE (train)', linestyle='--')
+
+plt.plot(test_ratio, l_base_test, '-', alpha=0.6, color='gray', label='Indep. baseline (test)')
+plt.plot(train_ratio, l_base_train, '-', alpha=train_alpha, color='gray', label='Indep. baseline (train)', linestyle='--')
+
+plt.xlabel('samples generated / size(target set)')
+plt.ylabel('recall')
+plt.xlim([0,45])
+plt.legend(loc='best')
+plt.savefig('recall_relative.pdf')
 
