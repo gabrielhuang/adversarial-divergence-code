@@ -6,8 +6,17 @@ from hyperplane_dataset import get_full_train_test
 
 full_dataset, train_dataset, test_dataset = get_full_train_test(25, range(10), 5, one_hot=False, validation=0.8, seed=1234)
 
+vae_digits_filename = 'results-vae/digits.npy'
+gan_digits_filename = 'results-gan/digits.npy'
+
+vae_digits = np.load(vae_digits_filename)
+gan_digits = np.load(gan_digits_filename)
+
+vae_sum = vae_digits.sum(axis=1)
+gan_sum = gan_digits.sum(axis=1)
+
 # generate baseline samples
-nb_samples = 70000
+nb_samples = len(vae_digits)
 flat_dataset = np.array(full_dataset.hyperplane_dataset.combinations).flatten()
 
 digits, freq = np.unique(flat_dataset, return_counts=True)
@@ -18,16 +27,6 @@ baseline_sum = samples.sum(axis=1)
 
 x_baseline, height_baseline = np.unique(baseline_sum, return_counts=True)
 height_baseline = height_baseline/float(len(baseline_sum)) * 100
-
-vae_digits_filename = 'results-vae/digits.npy'
-gan_digits_filename = 'results-gan/digits.npy'
-
-vae_digits = np.load(vae_digits_filename)
-gan_digits = np.load(gan_digits_filename)
-
-vae_sum = vae_digits.sum(axis=1)
-gan_sum = gan_digits.sum(axis=1)
-
 x_gan, height_gan = np.unique(gan_sum, return_counts=True)
 height_gan = height_gan/float(len(gan_sum)) * 100
 
@@ -161,7 +160,7 @@ plt.plot(train_ratio, l_base_train, '-', alpha=train_alpha, color='gray', label=
 
 plt.xlabel('samples generated / size(target set)')
 plt.ylabel('recall')
-plt.xlim([0,45])
+plt.xlim([0,40])
 plt.legend(loc='best')
 plt.savefig('recall_relative.pdf')
 
