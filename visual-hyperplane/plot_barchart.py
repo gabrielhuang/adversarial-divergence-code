@@ -66,7 +66,7 @@ l_gan_train = []
 l_gan_test = []
 l_base_train = []
 l_base_test = []
-for sample_ratio in np.linspace(0, 1, 10):
+for sample_ratio in np.linspace(0, 1, 30):
     N = min(len(vae_digits), len(gan_digits))
     n_samples = max(1, min(int(sample_ratio*N), N))
 
@@ -149,13 +149,14 @@ plt.rcParams.update(params)
 train_ratio = l_samples / float(len(train_dataset))
 test_ratio = l_samples / float(len(test_dataset))
 train_alpha = 0.3
-plt.plot(test_ratio, l_gan_test, '-', alpha=0.6, color='green', label='GAN (test)')
+test_alpha = 0.9
+plt.plot(test_ratio, l_gan_test, '-', alpha=test_alpha, color='green', label='GAN (test)')
 plt.plot(train_ratio, l_gan_train, '-', alpha=train_alpha, color='green', label='GAN (train)', linestyle='--')
 
-plt.plot(test_ratio, l_vae_test, '-', alpha=0.6, color='red', label='VAE (test)')
+plt.plot(test_ratio, l_vae_test, '-', alpha=test_alpha, color='red', label='VAE (test)')
 plt.plot(train_ratio, l_vae_train, '-', alpha=train_alpha, color='red', label='VAE (train)', linestyle='--')
 
-plt.plot(test_ratio, l_base_test, '-', alpha=0.6, color='gray', label='Indep. baseline (test)')
+plt.plot(test_ratio, l_base_test, '-', alpha=test_alpha, color='gray', label='Indep. baseline (test)')
 plt.plot(train_ratio, l_base_train, '-', alpha=train_alpha, color='gray', label='Indep. baseline (train)', linestyle='--')
 
 plt.xlabel('samples generated / size(target set)')
