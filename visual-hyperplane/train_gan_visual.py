@@ -25,7 +25,7 @@ parser.add_argument('--logdir', required=True, help='where to log samples and mo
 parser.add_argument('--save-samples', default=100, type=int, help='save samples every')
 parser.add_argument('--save-models', default=1000, type=int, help='save models every')
 parser.add_argument('--log-every', default=100, type=int, help='log every N iterations')
-parser.add_argument('--use-cuda', default=1, type=int, help='use cuda')
+parser.add_argument('--cuda', default=1, type=int, help='use cuda')
 parser.add_argument('--validate-every', default=20, type=int, help='validate every N iterations')
 parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
 parser.add_argument('--mnist', default='data', help='folder where MNIST is/will be downloaded')
@@ -149,7 +149,7 @@ if args.model_generator == 'unconstrained':
 else:
     netG = ImageGenerator(args.latent_global, args.latent_local, args.digits)
 
-if args.use_cuda:
+if args.cuda:
     netD = netD.cuda()
     netG = netG.cuda()
 print 'Discriminator', netD
@@ -182,7 +182,7 @@ for iteration in tqdm(xrange(args.iterations)):
     for iter_d in xrange(args.critic_iterations):
         # Real data
         real_data, real_labels = train_iter.next()
-        if args.use_cuda:
+        if args.cuda:
             real_data = real_data.cuda()
             real_labels = real_labels.cuda()
         real_data = Variable(real_data)
@@ -195,12 +195,12 @@ for iteration in tqdm(xrange(args.iterations)):
         # Fake data
         # volatile: do not compute gradient for netG
         # stop gradient at fake_data
-        fake_data = Variable(netG.generate(args.batch_size, use_cuda=args.use_cuda, volatile=True).data)
+        fake_data = Variable(netG.generate(args.batch_size, use_cuda=args.cuda, volatile=True).data)
         D_fake = netD(fake_data).mean()
 
         # Costs
         gradient_penalty = args.penalty * get_gradient_penalty(
-            netD, real_data.data, fake_data.data, double_sided=args.double_sided, cuda=args.use_cuda)
+            netD, real_data.data, fake_data.data, double_sided=args.double_sided, cuda=args.cuda)
         D_cost = D_fake - D_real + gradient_penalty
         Wasserstein_D = D_real - D_fake
 
@@ -231,7 +231,7 @@ for iteration in tqdm(xrange(args.iterations)):
 
     # Generate fake data
     # volatile: compute gradients for netG
-    fake_data = netG.generate(args.batch_size, use_cuda=args.use_cuda, volatile=False)
+    fake_data = netG.generate(args.batch_size, use_cuda=args.cuda, volatile=False)
     D_fake = netD(fake_data).mean()
 
     # Costs
@@ -252,7 +252,7 @@ for iteration in tqdm(xrange(args.iterations)):
     # Reconstructions
     if iteration % args.save_samples == 0:
         # Generate samples
-        samples = netG.generate(args.generate_samples, use_cuda=args.use_cuda)
+        samples = netG.generate(args.generate_samples, use_cuda=args.cuda)
 
         # Process and log
         view_train = view_samples(real_data.data, args.sample_rows)
