@@ -40,14 +40,14 @@ parser.add_argument('--data', default='combinations.pkl', help='pickled dataset'
 
 # VAE specific
 parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
-parser.add_argument('--latent', default=64, type=int, help='latent dimensions')
+parser.add_argument('--latent-global', default=200, type=int, help='latent dimensions')
 parser.add_argument('--sigma', default=0.1, type=float, help='vae gaussian bandwidth')
-parser.add_argument('--model', choices=['unconstrained', 'constrained'], required=True, help="The vae model to choose from ('unconstrained','constrained')")
+parser.add_argument('--model', default='constrained', choices=['unconstrained', 'constrained'], help="The vae model to choose from ('unconstrained','constrained')")
 
 args = parser.parse_args()
 print args
 date = time.strftime('%Y-%m-%d.%H%M')
-run_dir = '{}/vae-{}-{}'.format(args.logdir, args.latent, date)
+run_dir = '{}/vae-{}-{}'.format(args.logdir, args.latent_global, date)
 # Create models dir if deosnt exist
 models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
@@ -80,9 +80,9 @@ test_iter = infinite_data(test_loader)
 
 # Prepare models
 if args.model == 'unconstrained':
-    vae = UnconstrainedVAE(args.latent, args.digits, batchnorm=True)
+    vae = UnconstrainedVAE(args.latent_global, args.digits, batchnorm=True)
 elif args.model == 'constrained':
-    vae = VAE(args.digits, args.latent, batchnorm=True)
+    vae = VAE(args.digits, args.latent_global, batchnorm=True)
 else:
     raise ValueError('Model not specified.')
 if args.cuda:
