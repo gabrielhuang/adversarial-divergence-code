@@ -60,8 +60,6 @@ models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
 
-with open('{}/args.json'.format(run_dir), 'wb') as f:
-    json.dump(vars(args), f, indent=4)
 
 
 def view_samples(data, max_samples=None):
@@ -136,6 +134,10 @@ def infinite_data(loader):
 
 train_iter = infinite_data(train_loader)
 test_iter = infinite_data(test_loader)
+
+# Dump parameters
+with open('{}/args.json'.format(run_dir), 'wb') as f:
+    json.dump(vars(args), f, indent=4)
 
 # Prepare models
 if args.model_discriminator == 'unconstrained':

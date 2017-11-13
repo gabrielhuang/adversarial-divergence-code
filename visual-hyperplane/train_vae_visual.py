@@ -4,6 +4,7 @@ from tqdm import tqdm
 import argparse
 import cPickle as pickle
 import numpy as np
+import json
 import torch
 from torch.autograd import Variable
 import torchvision
@@ -77,6 +78,9 @@ def infinite_data(loader):
 train_iter = infinite_data(train_loader)
 test_iter = infinite_data(test_loader)
 
+# Dump parameters
+with open('{}/args.json'.format(run_dir), 'wb') as f:
+    json.dump(vars(args), f, indent=4)
 
 # Prepare models
 if args.model == 'unconstrained':
