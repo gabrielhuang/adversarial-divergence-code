@@ -2,6 +2,7 @@ import os
 import time
 from tqdm import tqdm
 import argparse
+import cPickle as pickle
 import numpy as np
 import torch
 from torch.autograd import Variable
@@ -12,8 +13,9 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import scipy.misc
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
-from hyperplane_dataset import HyperplaneImageDataset, get_full_train_test
 
+import hyperplane_dataset
+from hyperplane_dataset import HyperplaneImageDataset, get_full_train_test
 from models import VAE, UnconstrainedVAE
 
 
@@ -30,13 +32,11 @@ parser.add_argument('--log-every', default=100, type=int, help='log every N iter
 parser.add_argument('--cuda', default=1, type=int, help='use cuda')
 parser.add_argument('--validate-every', default=20, type=int, help='validate every N iterations')
 parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
-parser.add_argument('--random-seed', default=1234, type=int, help='random seed')
 parser.add_argument('--mnist', default='data', help='folder where MNIST is/will be downloaded')
 parser.add_argument('--sample-rows', default=10, type=int, help='how many samples in tensorboard')
 
 # task specific
-parser.add_argument('--amount', default=25, type=int, help='target to sum up to')
-parser.add_argument('--digits', default=5, type=int, help='how many digits per sequence')
+parser.add_argument('--data', default='combinations.pkl', help='pickled dataset')
 
 # VAE specific
 parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
@@ -53,7 +53,17 @@ models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
 
-full, train, test = get_full_train_test(args.amount, range(10), args.digits, one_hot=False, validation=0.8, seed=args.random_seed)
+# Load dataset
+with open(args.data, 'rb') as fp:
+    dataset = pickle.load(fp)
+full = dataset['full']
+train = dataset['train']
+test = dataset['test']
+args.digits = dataset['digits']
+args.amount = dataset['amount']
+print 'Loaded dataset {}'.format(args.data)
+print '    digits: {}'.format(args.digits)
+print '    amount: {}'.format(args.amount)
 
 train_visual = HyperplaneImageDataset(train, args.mnist, train=True)
 test_visual = HyperplaneImageDataset(test, args.mnist, train=False)
