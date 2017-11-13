@@ -3,6 +3,7 @@ import time
 from tqdm import tqdm
 import argparse
 import json
+import cPickle as pickle
 import torch
 from torch import nn
 from torch.autograd import Variable
@@ -27,13 +28,11 @@ parser.add_argument('--log-every', default=100, type=int, help='log every N iter
 parser.add_argument('--use-cuda', default=1, type=int, help='use cuda')
 parser.add_argument('--validate-every', default=20, type=int, help='validate every N iterations')
 parser.add_argument('--generate-samples', default=64, type=int, help='generate N samples')
-parser.add_argument('--random-seed', default=1234, type=int, help='random seed')
 parser.add_argument('--mnist', default='data', help='folder where MNIST is/will be downloaded')
 parser.add_argument('--sample-rows', default=10, type=int, help='how many samples in tensorboard')
 
 # task specific
-parser.add_argument('--amount', default=25, type=int, help='target to sum up to')
-parser.add_argument('--nb_digits', default=5, type=int, help='how many digits per sequence')
+parser.add_argument('--data', default='combinations.pkl', help='pickled dataset')
 
 # WGAN-GP specific
 parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient penalty')
@@ -111,8 +110,18 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided, cuda):
     return gradient_penalty
 
 
-full, train, test = get_full_train_test(args.amount, range(10), args.nb_digits,
-                                        one_hot=False, validation=0.8, seed=args.random_seed)
+# Load dataset
+with open(args.data, 'rb') as fp:
+    dataset = pickle.load(fp)
+full = dataset['full']
+train = dataset['train']
+test = dataset['test']
+args.digits = dataset['digits']
+args.amount = dataset['amount']
+print 'Loaded dataset {}'.format(args.data)
+print '    digits: {}'.format(args.digits)
+print '    amount: {}'.format(args.amount)
+
 train_visual = HyperplaneImageDataset(train, args.mnist, train=True)
 test_visual = HyperplaneImageDataset(test, args.mnist, train=False)
 train_loader = DataLoader(train_visual, batch_size=args.batch_size, shuffle=True)
@@ -130,15 +139,15 @@ test_iter = infinite_data(test_loader)
 
 # Prepare models
 if args.model_discriminator == 'unconstrained':
-    netD = UnconstrainedImageDiscriminator(args.nb_digits, args.unconstrained_size)
+    netD = UnconstrainedImageDiscriminator(args.digits, args.unconstrained_size)
 elif args.model_discriminator == 'constrained':
-    netD = ImageDiscriminator(args.nb_digits)
+    netD = ImageDiscriminator(args.digits)
 elif args.model_discriminator == 'semi':
-    netD = SemiSupervisedImageDiscriminator(args.nb_digits)
+    netD = SemiSupervisedImageDiscriminator(args.digits)
 if args.model_generator == 'unconstrained':
-    netG = UnconstrainedImageGenerator(args.latent_global, args.nb_digits, args.unconstrained_size)
+    netG = UnconstrainedImageGenerator(args.latent_global, args.digits, args.unconstrained_size)
 else:
-    netG = ImageGenerator(args.latent_global, args.latent_local, args.nb_digits)
+    netG = ImageGenerator(args.latent_global, args.latent_local, args.digits)
 
 if args.use_cuda:
     netD = netD.cuda()
@@ -249,8 +258,8 @@ for iteration in tqdm(xrange(args.iterations)):
         view_train = view_samples(real_data.data, args.sample_rows)
         view_gen = view_samples(samples.data, args.sample_rows)
 
-        gallery_train = torchvision.utils.make_grid(view_train, nrow=args.nb_digits, normalize=True, range=(0, 1))
-        gallery_gen = torchvision.utils.make_grid(view_gen, nrow=args.nb_digits, normalize=True, range=(0, 1))
+        gallery_train = torchvision.utils.make_grid(view_train, nrow=args.digits, normalize=True, range=(0, 1))
+        gallery_gen = torchvision.utils.make_grid(view_gen, nrow=args.digits, normalize=True, range=(0, 1))
 
         log.add_image('train', gallery_train, iteration)
         log.add_image('generation', gallery_gen, iteration)
