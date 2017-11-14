@@ -1,5 +1,5 @@
 #!/bin/bash
 
-ITERATIONS=${1:-70}
+ITERATIONS=${1:-200}
 
-python deploy.py --iterations $ITERATIONS --model trained_models/generator_99000.torch --use-cuda 1 results-gan
+python deploy.py --iterations $ITERATIONS --model trained_models/gan_new.torch --use-cuda 1 results-gan
