@@ -179,7 +179,8 @@ print 'Perfect recalls:'
 print '\ttrain', recall_perfect_train
 print '\ttest', recall_perfect_test
 
-# Make actual figure
+
+# Make actual figure (full train test)
 plt.figure()
 plt.clf()
 plt.rcParams['text.latex.preamble'] = [r"\usepackage{lmodern}"]
@@ -201,16 +202,17 @@ plt.plot(l_samples_norm, l_vae_train, '->', alpha=0.6, color='red', label='VAE (
 plt.plot(l_samples_norm, l_base_test, '-s', alpha=0.6, color='gray', label='Indep. baseline (test)')
 plt.plot(l_samples_norm, l_base_train, '-s', alpha=0.6, color='gray', label='Indep. baseline (train)', linestyle='--')
 
-#plt.plot(l_samples_norm, l_perfect_test, '-d', alpha=0.6, color='blue', label='Perfect (test)')
-#plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='Perfect (train same as test)', linestyle='--')
-plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='Perfect (train same as test)')
+plt.plot(l_samples_norm, l_perfect_test, '-d', alpha=0.6, color='blue', label='Perfect (test)')
+plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='Perfect (train)', linestyle='--')
 
 plt.xlabel('samples generated / number of total combinations')
 plt.ylabel('recall')
 plt.legend(loc='best')
 plt.savefig('recall.pdf')
 
-# Make actual figure
+
+
+# Make actual figure (merged train_test)
 plt.figure()
 plt.clf()
 plt.rcParams['text.latex.preamble'] = [r"\usepackage{lmodern}"]
@@ -221,25 +223,20 @@ params = {'text.usetex': True,
           }
 plt.rcParams.update(params)
 
-train_ratio = l_samples / float(len(train_dataset))
-test_ratio = l_samples / float(len(test_dataset))
-train_alpha = 0.3
-test_alpha = 0.9
-plt.plot(test_ratio, l_gan_test, '-', alpha=test_alpha, color='green', label='GAN (test)')
-plt.plot(train_ratio, l_gan_train, '-', alpha=train_alpha, color='green', label='GAN (train)', linestyle='--')
+l_samples_norm = l_samples / float(len(full_dataset))
 
-plt.plot(test_ratio, l_vae_test, '-', alpha=test_alpha, color='red', label='VAE (test)')
-plt.plot(train_ratio, l_vae_train, '-', alpha=train_alpha, color='red', label='VAE (train)', linestyle='--')
+plt.plot(l_samples_norm, l_gan_test, '-o', alpha=0.6, color='green', label='GAN (test)')
+plt.plot(l_samples_norm, l_gan_train, '-o', alpha=0.6, color='green', label='GAN (train)', linestyle='--')
 
-plt.plot(test_ratio, l_base_test, '-', alpha=test_alpha, color='gray', label='Indep. baseline (test)')
-plt.plot(train_ratio, l_base_train, '-', alpha=train_alpha, color='gray', label='Indep. baseline (train)', linestyle='--')
+plt.plot(l_samples_norm, l_vae_test, '->', alpha=0.6, color='red', label='VAE (test)')
+plt.plot(l_samples_norm, l_vae_train, '->', alpha=0.6, color='red', label='VAE (train)', linestyle='--')
 
-plt.plot(test_ratio, l_perfect_test, '-', alpha=test_alpha, color='blue', label='Perfect (test)')
-plt.plot(train_ratio, l_perfect_train, '-', alpha=train_alpha, color='blue', label='Perfect (train)', linestyle='--')
+plt.plot(l_samples_norm, l_base_train, '-s', alpha=0.6, color='gray', label='Indep. baseline (train same as test)')
 
-plt.xlabel('samples generated / size(target set)')
+plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='Perfect (train same as test)')
+
+plt.xlabel('samples generated / number of total combinations')
 plt.ylabel('recall')
-plt.xlim([0,40])
 plt.legend(loc='best')
-plt.savefig('recall_relative.pdf')
+plt.savefig('recall_merged.pdf')
 
