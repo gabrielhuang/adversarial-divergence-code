@@ -1,10 +1,22 @@
+import cPickle as pickle
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
-from hyperplane_dataset import get_full_train_test
+import hyperplane_dataset
 
-full_dataset, train_dataset, test_dataset = get_full_train_test(25, range(10), 5, one_hot=False, validation=0.8, seed=1234)
+# Load dataset
+data = 'combinations.pkl'
+with open(data, 'rb') as fp:
+    dataset = pickle.load(fp)
+full_dataset = dataset['full']
+train_dataset = dataset['train']
+test_dataset = dataset['test']
+digits = dataset['digits']
+amount = dataset['amount']
+print 'Loaded dataset {}'.format(data)
+print '    digits: {}'.format(digits)
+print '    amount: {}'.format(amount)
 
 vae_digits_filename = 'results-vae/digits.npy'
 gan_digits_filename = 'results-gan/digits.npy'
@@ -138,19 +150,21 @@ params = {'text.usetex': True,
           }
 plt.rcParams.update(params)
 
-plt.plot(l_samples, l_gan_test, '-o', alpha=0.6, color='green', label='GAN (test)')
-plt.plot(l_samples, l_gan_train, '-o', alpha=0.6, color='green', label='GAN (train)', linestyle='--')
+l_samples_norm = l_samples / float(len(full_dataset))
 
-plt.plot(l_samples, l_vae_test, '-o', alpha=0.6, color='red', label='VAE (test)')
-plt.plot(l_samples, l_vae_train, '-o', alpha=0.6, color='red', label='VAE (train)', linestyle='--')
+plt.plot(l_samples_norm, l_gan_test, '-o', alpha=0.6, color='green', label='GAN (test)')
+plt.plot(l_samples_norm, l_gan_train, '-o', alpha=0.6, color='green', label='GAN (train)', linestyle='--')
 
-plt.plot(l_samples, l_base_test, '-o', alpha=0.6, color='gray', label='Indep. baseline (test)')
-plt.plot(l_samples, l_base_train, '-o', alpha=0.6, color='gray', label='Indep. baseline (train)', linestyle='--')
+plt.plot(l_samples_norm, l_vae_test, '->', alpha=0.6, color='red', label='VAE (test)')
+plt.plot(l_samples_norm, l_vae_train, '->', alpha=0.6, color='red', label='VAE (train)', linestyle='--')
 
-plt.plot(l_samples, l_perfect_test, '-o', alpha=0.6, color='blue', label='Perfect (test)')
-plt.plot(l_samples, l_perfect_train, '-o', alpha=0.6, color='blue', label='Perfect (train)', linestyle='--')
+plt.plot(l_samples_norm, l_base_test, '-s', alpha=0.6, color='gray', label='Indep. baseline (test)')
+plt.plot(l_samples_norm, l_base_train, '-s', alpha=0.6, color='gray', label='Indep. baseline (train)', linestyle='--')
 
-plt.xlabel('samples generated')
+plt.plot(l_samples_norm, l_perfect_test, '-d', alpha=0.6, color='blue', label='Perfect (test)')
+plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='Perfect (train)', linestyle='--')
+
+plt.xlabel('samples generated / number of total combinations')
 plt.ylabel('recall')
 plt.legend(loc='best')
 plt.savefig('recall.pdf')
