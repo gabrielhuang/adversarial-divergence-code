@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 # How many runs? (samples will be divided by that number)
 n_runs = 5
+n_points = 30
 
 # Load dataset
 data = 'combinations.pkl'
@@ -27,6 +28,9 @@ gan_digits_filename = 'results-gan/digits.npy'
 
 vae_digits = np.load(vae_digits_filename)
 gan_digits = np.load(gan_digits_filename)
+
+#vae_digits = vae_digits[:100000]
+#gan_digits = gan_digits[:100000]
 
 vae_sum = vae_digits.sum(axis=1)
 gan_sum = gan_digits.sum(axis=1)
@@ -102,28 +106,29 @@ for run in xrange(n_runs):
     r_base_test = []
     r_perfect_train = []
     r_perfect_test = []
-    for sample_ratio in tqdm(np.linspace(0, 1, 30)):
-        N = min(len(vae_digits), len(gan_digits))
+    for sample_ratio in tqdm(np.linspace(0, 1, n_points)):
+        N = samples_per_run
         n_samples = max(1, min(int(sample_ratio*N), N))
+        i = run*samples_per_run # starter index
 
-        #recall_vae_full = get_recall(vae_digits[:n_samples], full_dataset)
-        recall_vae_train = get_recall(vae_digits[:n_samples], train_dataset)
-        recall_vae_test = get_recall(vae_digits[:n_samples], test_dataset)
+        #recall_vae_full = get_recall(vae_digits[i:i+n_samples], full_dataset)
+        recall_vae_train = get_recall(vae_digits[i:i+n_samples], train_dataset)
+        recall_vae_test = get_recall(vae_digits[i:i+n_samples], test_dataset)
 
-        #recall_gan_full = get_recall(gan_digits[:n_samples], full_dataset)
-        recall_gan_train = get_recall(gan_digits[:n_samples], train_dataset)
-        recall_gan_test = get_recall(gan_digits[:n_samples], test_dataset)
+        #recall_gan_full = get_recall(gan_digits[i:i+n_samples], full_dataset)
+        recall_gan_train = get_recall(gan_digits[i:i+n_samples], train_dataset)
+        recall_gan_test = get_recall(gan_digits[i:i+n_samples], test_dataset)
 
-        #recall_base_full = get_recall(base_digits[:n_samples], full_dataset)
-        recall_base_train = get_recall(base_digits[:n_samples], train_dataset)
-        recall_base_test = get_recall(base_digits[:n_samples], test_dataset)
+        #recall_base_full = get_recall(base_digits[i:i+n_samples], full_dataset)
+        recall_base_train = get_recall(base_digits[i:i+n_samples], train_dataset)
+        recall_base_test = get_recall(base_digits[i:i+n_samples], test_dataset)
 
-        #recall_perfect_full = get_recall(perfect_digits[:n_samples], full_dataset)
-        recall_perfect_train = get_recall(perfect_digits[:n_samples], train_dataset)
-        recall_perfect_test = get_recall(perfect_digits[:n_samples], test_dataset)
+        #recall_perfect_full = get_recall(perfect_digits[i:i+n_samples], full_dataset)
+        recall_perfect_train = get_recall(perfect_digits[i:i+n_samples], train_dataset)
+        recall_perfect_test = get_recall(perfect_digits[i:i+n_samples], test_dataset)
 
         # accumulate
-        r_samples.append(n_samples)
+        l_samples.append(n_samples)
         r_vae_train.append(recall_vae_train)
         r_vae_test.append(recall_vae_test)
         r_gan_train.append(recall_gan_train)
