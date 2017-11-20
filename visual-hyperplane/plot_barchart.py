@@ -199,8 +199,8 @@ plt.plot(l_samples_norm, l_gan_train, '-o', alpha=0.6, color='green', label='GAN
 plt.plot(l_samples_norm, l_vae_test, '->', alpha=0.6, color='red', label='VAE (test)')
 plt.plot(l_samples_norm, l_vae_train, '->', alpha=0.6, color='red', label='VAE (train)', linestyle='--')
 
-plt.plot(l_samples_norm, l_base_test, '-s', alpha=0.6, color='gray', label='Indep. baseline (test)')
-plt.plot(l_samples_norm, l_base_train, '-s', alpha=0.6, color='gray', label='Indep. baseline (train)', linestyle='--')
+plt.plot(l_samples_norm, l_base_test, '-s', alpha=0.6, color='gray', label='Indep. Baseline (test)')
+plt.plot(l_samples_norm, l_base_train, '-s', alpha=0.6, color='gray', label='Indep. Baseline (train)', linestyle='--')
 
 plt.plot(l_samples_norm, l_perfect_test, '-d', alpha=0.6, color='blue', label='Perfect (test)')
 plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='Perfect (train)', linestyle='--')
@@ -231,9 +231,9 @@ plt.plot(l_samples_norm, l_gan_train, '-o', alpha=0.6, color='green', label='GAN
 plt.plot(l_samples_norm, l_vae_test, '->', alpha=0.6, color='red', label='VAE (test)')
 plt.plot(l_samples_norm, l_vae_train, '->', alpha=0.6, color='red', label='VAE (train)', linestyle='--')
 
-plt.plot(l_samples_norm, l_base_train, '-s', alpha=0.6, color='gray', label='Indep. baseline (train same as test)')
+plt.plot(l_samples_norm, l_base_train, '-s', alpha=0.6, color='gray', label='Indep. Baseline')
 
-plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='Perfect (train same as test)')
+plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='Perfect')
 
 plt.xlabel('samples generated / number of total combinations')
 plt.ylabel('recall')
