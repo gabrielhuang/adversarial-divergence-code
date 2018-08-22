@@ -142,8 +142,8 @@ model_visual_samplers = [ModelVisualSampler(vaes[i]) for i in xrange(10)]
 target_combinations = sum_25.train_positive
 
 # Pick model joint distribution
-model_combinations = uniform.train_positive
-#model_combinations = sum_25.train_positive
+#model_combinations = uniform.train_positive
+model_combinations = sum_25.train_positive
 
 ##########################################
 # Create discriminator
@@ -156,6 +156,7 @@ criterion = torch.nn.BCELoss()
 
 ITERATIONS = 1000
 classifier_losses = []
+classifier_accuracies = []
 penalty_losses = []
 total_losses = []
 PENALTY = 10.
@@ -187,7 +188,7 @@ for iteration in xrange(ITERATIONS):
         #!!!!!!!!!!!!! DEBUG, USE TEST SET VISUAL MODEL !!!!!!!!!!!!!
 
         # Make visual by sampling from VAEs
-        #model_visual.append(combination_to_visual(target_combination, model_visual_samplers))
+        #model_visual.append(combination_to_visual(model_combination, model_visual_samplers))
         model_visual.append(combination_to_visual(model_combination, target_visual_samplers))
 
     target_visual = torch.cat(target_visual, 0)
@@ -207,6 +208,7 @@ for iteration in xrange(ITERATIONS):
     target_score = criterion(target_output, target_target)
     model_score = criterion(model_output, model_target)
     classifier_loss = 0.5 * (target_score + model_score)
+    classifier_accuracy = 0.5 * ((target_score>0.5).float() + (model_score<=0.5).float())
 
     # Compute penalty
     target_penalty = compute_gradient_penalty(discriminator, target_visual)
@@ -222,6 +224,7 @@ for iteration in xrange(ITERATIONS):
     ######################################
     # Log
     classifier_losses.append(classifier_loss.item())
+    classifier_accuracies.append(classifier_accuracy.item())
     penalty_losses.append(penalty_loss.item())
     total_losses.append(total_loss.item())
     if iteration % 50 == 0:
@@ -229,6 +232,7 @@ for iteration in xrange(ITERATIONS):
         print 'Target', target_output.mean().item()
         print 'Model', model_output.mean().item()
         print 'Classifier Loss', summarize(classifier_losses)
+        print 'Classifier Accuracies', summarize(classifier_accuracies)
         print 'Penalty Loss', summarize(penalty_losses)
         print 'Total Loss', summarize(total_losses)
 
