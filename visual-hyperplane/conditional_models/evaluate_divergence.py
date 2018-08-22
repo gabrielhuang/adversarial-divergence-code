@@ -39,6 +39,25 @@ def load_one_mnist_digit(digit, train, debug=False):
                 print 'WARNING THIS IS DEBUG MODE'
                 break
     return test_digits
+
+
+def compute_gradient_penalty(netD, data):
+
+    # Dunnow how to do this better with detach
+    data = torch.autograd.Variable(data.detach(), requires_grad=True)
+    outputs = netD(data)
+
+    gradients = torch.autograd.grad(outputs=outputs,
+                                    inputs=data,
+                                    grad_outputs=torch.ones(outputs.size()),
+                                    create_graph=True,
+                                    retain_graph=True,
+                                    only_inputs=True)[0]
+
+    old_gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    new_gradient_penalty = torch.max((gradients**2).sum() - 1., torch.zeros(1))
+    return new_gradient_penalty
+
 ##################
 
 
@@ -96,7 +115,24 @@ def create_model_visual_sampler(i, test_loaders):
         return vaes[i].generate(1)[0,0]
 
     return visual_sampler
-model_visual_samplers = [create_model_visual_sampler(i, test_loaders) for i in xrange(10)]
+
+class ModelVisualSampler(object):
+    def __init__(self, vae, batch_size=32):
+        self.idx = batch_size
+        self.batch_size = batch_size
+        self.vae = vae
+
+    def __call__(self):  # return one sample
+        if self.idx >= self.batch_size:
+            # Regenerate new
+            self.cache = self.vae.generate(self.batch_size)
+            self.idx = 0
+        sample = self.cache[self.idx][None, ...]  # preserve dims
+        self.idx += 1
+        return sample
+
+#model_visual_samplers = [create_model_visual_sampler(i, test_loaders) for i in xrange(10)]
+model_visual_samplers = [ModelVisualSampler(vaes[i]) for i in xrange(10)]
 
 
 ##########################################
@@ -104,8 +140,8 @@ model_visual_samplers = [create_model_visual_sampler(i, test_loaders) for i in x
 target_combinations = sum_25.train_positive
 
 # Pick model joint distribution
-model_combinations = uniform.train_positive
-#model_combinations = sum_25.train_positive
+#model_combinations = uniform.train_positive
+model_combinations = sum_25.train_positive
 
 ##########################################
 # Create discriminator
@@ -117,7 +153,14 @@ optimizer = torch.optim.Adam(discriminator.parameters())
 criterion = torch.nn.BCELoss()
 
 ITERATIONS = 1000
-discriminator_losses = {}
+classifier_losses = []
+penalty_losses = []
+total_losses = []
+PENALTY = 10.
+
+def summarize(v):
+    return '{:.3f} +/- {:.3f}'.format(np.mean(v), np.std(v)/np.sqrt(len(v)))
+
 for iteration in xrange(ITERATIONS):
     ####################################
     #  Sample data
@@ -151,22 +194,30 @@ for iteration in xrange(ITERATIONS):
     # Compute loss
     target_score = criterion(target_output, target_target)
     model_score = criterion(model_output, model_target)
-    discriminator_loss = 0.5 * (target_score + model_score)
+    classifier_loss = 0.5 * (target_score + model_score)
+
+    # Compute penalty
+    target_penalty = compute_gradient_penalty(discriminator, target_visual)
+    model_penalty = compute_gradient_penalty(discriminator, model_visual)
+    penalty_loss = PENALTY * (target_penalty + model_penalty)
+
+    total_loss = classifier_loss + penalty_loss
 
     optimizer.zero_grad()
-    discriminator_loss.backward()
+    total_loss.backward()
     optimizer.step()
 
     ######################################
     # Log
-    discriminator_losses[iteration] = discriminator_loss.item()
+    classifier_losses.append(classifier_loss.item())
+    penalty_losses.append(penalty_loss)
+    total_losses.append(total_loss)
     if iteration % 50 == 0:
         print 'Iteration', iteration
         print 'Target', target_output.mean().item()
         print 'Model', model_output.mean().item()
-        print 'Total loss', discriminator_loss.item()
-        print 'Avg loss {:.3f} +/- {:.3f}'.format(
-            np.mean(discriminator_losses.values()),
-            np.std(discriminator_losses.values())/np.sqrt(len(discriminator_losses)))
+        print 'Classifier Loss', summarize(classifier_losses.values())
+        print 'Penalty Loss', summarize(penalty_losses.values())
+        print 'Total Loss', summarize(total_losses.values())
 
 
