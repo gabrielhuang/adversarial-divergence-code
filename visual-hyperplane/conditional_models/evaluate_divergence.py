@@ -142,8 +142,8 @@ model_visual_samplers = [ModelVisualSampler(vaes[i]) for i in xrange(10)]
 target_combinations = sum_25.train_positive
 
 # Pick model joint distribution
-model_combinations = uniform.train_positive
-#model_combinations = sum_25.train_positive
+#model_combinations = uniform.train_positive
+model_combinations = sum_25.train_positive
 
 ##########################################
 # Create discriminator
