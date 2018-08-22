@@ -142,8 +142,8 @@ model_visual_samplers = [ModelVisualSampler(vaes[i]) for i in xrange(10)]
 target_combinations = sum_25.train_positive
 
 # Pick model joint distribution
-#model_combinations = uniform.train_positive
-model_combinations = sum_25.train_positive
+model_combinations = uniform.train_positive
+#model_combinations = sum_25.train_positive
 
 ##########################################
 # Create discriminator
@@ -184,8 +184,11 @@ for iteration in xrange(ITERATIONS):
         model_idx = np.random.choice(len(model_combinations))
         model_combination = model_combinations[target_idx]
 
+        #!!!!!!!!!!!!! DEBUG, USE TEST SET VISUAL MODEL !!!!!!!!!!!!!
+
         # Make visual by sampling from VAEs
-        model_visual.append(combination_to_visual(target_combination, model_visual_samplers))
+        #model_visual.append(combination_to_visual(target_combination, model_visual_samplers))
+        model_visual.append(combination_to_visual(model_combination, target_visual_samplers))
 
     target_visual = torch.cat(target_visual, 0)
     model_visual = torch.cat(model_visual, 0)
