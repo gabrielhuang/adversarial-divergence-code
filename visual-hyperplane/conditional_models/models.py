@@ -63,6 +63,34 @@ class Discriminator1(nn.Module):
         return x
 
 
+class Discriminator2(nn.Module):
+    def __init__(self):
+        nn.Module.__init__(self)
+
+        self.shared = nn.Sequential(
+            nn.Linear(784, 400),
+            nn.ReLU(),
+            nn.Linear(400, 20),
+            nn.ReLU(),
+            nn.Linear(20, 1),
+        )
+        self.merge = nn.Sequential(
+            nn.Linear(1*5, 80),
+            nn.ReLU(),
+            nn.Linear(80, 20),
+            nn.ReLU(),
+            nn.Linear(20, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        x_per_digit = x.view(len(x)*5, -1)
+        embeddings = self.shared(x_per_digit)
+        embeddings_merged = embeddings.view(len(x), -1)
+        out = self.merge(embeddings_merged)
+        return out
+
+
 def loss_function(recon_x, x, mu, logvar):
     BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), size_average=False)
 

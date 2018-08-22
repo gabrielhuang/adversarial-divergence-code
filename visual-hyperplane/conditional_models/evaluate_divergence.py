@@ -2,7 +2,7 @@ import sys
 sys.path.append('..')
 import torch
 from torchvision import datasets, transforms
-from models import VAE, loss_function, Discriminator1
+from models import VAE, loss_function, Discriminator1, Discriminator2
 from problems import get_problem
 import numpy as np
 #import matplotlib.pyplot as plt
@@ -26,7 +26,7 @@ def combination_to_visual(combination, visual_samplers):
     for c in combination:
         sample = visual_samplers[c]()
         x.append(sample[None, :, :])
-    visual_combination = torch.cat(x)
+    visual_combination = torch.cat(x)[None, ...]
     return visual_combination
 
 # Load only one digit from mnist
@@ -104,12 +104,13 @@ model_visual_samplers = [create_model_visual_sampler(i, test_loaders) for i in x
 target_combinations = sum_25.train_positive
 
 # Pick model joint distribution
-#model_combinations = uniform.train_positive
-model_combinations = sum_25.train_positive
+model_combinations = uniform.train_positive
+#model_combinations = sum_25.train_positive
 
 ##########################################
 # Create discriminator
-discriminator = Discriminator1(with_sigmoid=True)
+#discriminator = Discriminator1(with_sigmoid=True)
+discriminator = Discriminator2()
 optimizer = torch.optim.Adam(discriminator.parameters())
 
 ##########################################
