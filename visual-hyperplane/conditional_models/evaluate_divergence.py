@@ -142,14 +142,14 @@ model_visual_samplers = [ModelVisualSampler(vaes[i]) for i in xrange(10)]
 target_combinations = sum_25.train_positive
 
 # Pick model joint distribution
-#model_combinations = uniform.train_positive
-model_combinations = sum_25.train_positive
+model_combinations = uniform.train_positive
+#model_combinations = sum_25.train_positive
 
 ##########################################
 # Create discriminator
 #discriminator = Discriminator1(with_sigmoid=True)
 discriminator = Discriminator2()
-optimizer = torch.optim.Adam(discriminator.parameters())
+optimizer = torch.optim.Adam(discriminator.parameters(), lr=1e-3)
 
 ##########################################
 criterion = torch.nn.BCELoss()
@@ -188,8 +188,8 @@ for iteration in xrange(ITERATIONS):
         #!!!!!!!!!!!!! DEBUG, USE TEST SET VISUAL MODEL !!!!!!!!!!!!!
 
         # Make visual by sampling from VAEs
-        #model_visual.append(combination_to_visual(model_combination, model_visual_samplers))
-        model_visual.append(combination_to_visual(model_combination, target_visual_samplers))
+        model_visual.append(combination_to_visual(model_combination, model_visual_samplers))
+        #model_visual.append(combination_to_visual(model_combination, target_visual_samplers))
 
     target_visual = torch.cat(target_visual, 0)
     model_visual = torch.cat(model_visual, 0)
@@ -208,7 +208,7 @@ for iteration in xrange(ITERATIONS):
     target_score = criterion(target_output, target_target)
     model_score = criterion(model_output, model_target)
     classifier_loss = 0.5 * (target_score + model_score)
-    classifier_accuracy = 0.5 * ((target_score>0.5).float() + (model_score<=0.5).float())
+    classifier_accuracy = 0.5 * ((target_output>0.5).float().mean() + (model_output<=0.5).float().mean())
 
     # Compute penalty
     target_penalty = compute_gradient_penalty(discriminator, target_visual)
