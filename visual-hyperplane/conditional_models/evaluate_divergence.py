@@ -22,11 +22,12 @@ def combination_to_visual(combination, visual_samplers):
     -------
     visual_combination: torch.Tensor (part~5, height~28, width~28)
     '''
+    # accumulate along channel dimension
     x = []
     for c in combination:
         sample = visual_samplers[c]()
-        x.append(sample[None, :, :])
-    visual_combination = torch.cat(x)[None, ...]
+        x.append(sample)
+    visual_combination = torch.cat(x, 1)
     return visual_combination
 
 # Load only one digit from mnist
@@ -54,9 +55,11 @@ def compute_gradient_penalty(netD, data):
                                     retain_graph=True,
                                     only_inputs=True)[0]
 
-    old_gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-    new_gradient_penalty = torch.max((gradients**2).sum() - 1., torch.zeros(1))
-    return new_gradient_penalty
+    # Careful with the dimensions!! The input is multidimensional
+    #old_gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    #new_gradient_penalty = torch.max((gradients**2).sum() - 1., torch.zeros(1))
+    relaxed_gradient_penalty = (gradients**2).sum() / float(len(data))
+    return relaxed_gradient_penalty
 
 ##################
 
@@ -87,7 +90,6 @@ for i in xrange(10):
 
 #####################################################
 print 'Loading MNIST digits'
-batch_size = 1
 
 # Load all MNIST digits
 test_digits = {}
@@ -97,14 +99,14 @@ for i in xrange(10):
     test_digit = load_one_mnist_digit(i, train=False, debug=True)
     test_digits[i] = test_digit
 
-    test_loader = torch.utils.data.DataLoader(test_digit, batch_size=batch_size, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_digit, batch_size=1, shuffle=True)
     test_loaders[i] = test_loader
 
 
 #####################################################
 def create_target_visual_sampler(i, test_loaders):
     def visual_sampler():
-        return iter(test_loaders[int(i)]).next()[0][0, 0]
+        return iter(test_loaders[int(i)]).next()[0]
 
     return visual_sampler
 target_visual_samplers = [create_target_visual_sampler(i, test_loaders) for i in xrange(10)]
@@ -117,7 +119,7 @@ def create_model_visual_sampler(i, test_loaders):
     return visual_sampler
 
 class ModelVisualSampler(object):
-    def __init__(self, vae, batch_size=32):
+    def __init__(self, vae, batch_size=64):
         self.idx = batch_size
         self.batch_size = batch_size
         self.vae = vae
@@ -129,7 +131,7 @@ class ModelVisualSampler(object):
             self.idx = 0
         sample = self.cache[self.idx][None, ...]  # preserve dims
         self.idx += 1
-        return sample
+        return sample.detach()
 
 #model_visual_samplers = [create_model_visual_sampler(i, test_loaders) for i in xrange(10)]
 model_visual_samplers = [ModelVisualSampler(vaes[i]) for i in xrange(10)]
@@ -157,29 +159,36 @@ classifier_losses = []
 penalty_losses = []
 total_losses = []
 PENALTY = 10.
+batch_size = 32
 
-def summarize(v):
+def summarize(u, suffix=50):
+    v = u[-min(suffix, len(u)):]
     return '{:.3f} +/- {:.3f}'.format(np.mean(v), np.std(v)/np.sqrt(len(v)))
 
 for iteration in xrange(ITERATIONS):
     ####################################
     #  Sample data
 
-    # Sample combination from TARGET
-    target_idx = np.random.choice(len(target_combinations))
-    target_combination = target_combinations[target_idx]
+    target_visual = []
+    model_visual = []
+    for j in xrange(batch_size):
+        # Sample combination from TARGET
+        target_idx = np.random.choice(len(target_combinations))
+        target_combination = target_combinations[target_idx]
 
-    # Make visual
-    target_visual = combination_to_visual(target_combination, target_visual_samplers)
-    #plt.imshow(target_visual.resize(5 * 28, 28))
+        # Make visual
+        target_visual.append(combination_to_visual(target_combination, target_visual_samplers))
+        #plt.imshow(target_visual.resize(5 * 28, 28))
 
-    # Sample combination from MODEL
-    model_idx = np.random.choice(len(model_combinations))
-    model_combination = model_combinations[target_idx]
+        # Sample combination from MODEL
+        model_idx = np.random.choice(len(model_combinations))
+        model_combination = model_combinations[target_idx]
 
-    # Make visual by sampling from VAEs
-    model_visual = combination_to_visual(target_combination, model_visual_samplers)
-    #plt.imshow(model_visual.detach().resize(5 * 28, 28))
+        # Make visual by sampling from VAEs
+        model_visual.append(combination_to_visual(target_combination, model_visual_samplers))
+
+    target_visual = torch.cat(target_visual, 0)
+    model_visual = torch.cat(model_visual, 0)
 
     ####################################
     #  Train discriminator
@@ -210,14 +219,14 @@ for iteration in xrange(ITERATIONS):
     ######################################
     # Log
     classifier_losses.append(classifier_loss.item())
-    penalty_losses.append(penalty_loss)
-    total_losses.append(total_loss)
+    penalty_losses.append(penalty_loss.item())
+    total_losses.append(total_loss.item())
     if iteration % 50 == 0:
         print 'Iteration', iteration
         print 'Target', target_output.mean().item()
         print 'Model', model_output.mean().item()
-        print 'Classifier Loss', summarize(classifier_losses.values())
-        print 'Penalty Loss', summarize(penalty_losses.values())
-        print 'Total Loss', summarize(total_losses.values())
+        print 'Classifier Loss', summarize(classifier_losses)
+        print 'Penalty Loss', summarize(penalty_losses)
+        print 'Total Loss', summarize(total_losses)
 
 

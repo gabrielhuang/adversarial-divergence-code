@@ -72,10 +72,10 @@ class Discriminator2(nn.Module):
             nn.ReLU(),
             nn.Linear(400, 20),
             nn.ReLU(),
-            nn.Linear(20, 1),
+            nn.Linear(20, 20),
         )
         self.merge = nn.Sequential(
-            nn.Linear(1*5, 80),
+            nn.Linear(20*5, 80),
             nn.ReLU(),
             nn.Linear(80, 20),
             nn.ReLU(),
