@@ -29,12 +29,40 @@ class VAE(nn.Module):
         h3 = F.relu(self.fc3(z))
         return F.sigmoid(self.fc4(h3))
 
+    def generate(self, batch_size):
+        z = torch.randn(batch_size, 20)
+        x = self.decode(z)
+        return x.view(len(x), 1, 28, 28)
+
     def forward(self, x):
         mu, logvar = self.encode(x.view(-1, 784))
         z = self.reparameterize(mu, logvar)
         return self.decode(z), mu, logvar
 
-    
+
+class Discriminator1(nn.Module):
+    def __init__(self, with_sigmoid):
+        nn.Module.__init__(self)
+
+        self.with_sigmoid = with_sigmoid
+        layers = [
+            nn.Linear(784*5, 400),
+            nn.ReLU(),
+            nn.Linear(400, 20),
+            nn.ReLU(),
+            nn.Linear(20, 1),
+        ]
+        if with_sigmoid:
+            layers.append(nn.Sigmoid())
+
+        self.main = nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = x.view(-1, 784*5)  # concatenate all dimensions
+        x = self.main(x)
+        return x
+
+
 def loss_function(recon_x, x, mu, logvar):
     BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), size_average=False)
 
