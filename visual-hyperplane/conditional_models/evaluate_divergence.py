@@ -159,6 +159,7 @@ classifier_losses = []
 classifier_accuracies = []
 penalty_losses = []
 total_losses = []
+eval_classifier_accuracies = []
 PENALTY = 10.
 batch_size = 32
 
@@ -166,74 +167,106 @@ def summarize(u, suffix=50):
     v = u[-min(suffix, len(u)):]
     return '{:.3f} +/- {:.3f}'.format(np.mean(v), np.std(v)/np.sqrt(len(v)))
 
-for iteration in xrange(ITERATIONS):
-    ####################################
-    #  Sample data
+try:
+    for iteration in xrange(ITERATIONS):
+        ####################################
+        #  Sample data
 
-    target_visual = []
-    model_visual = []
-    for j in xrange(batch_size):
-        # Sample combination from TARGET
-        target_idx = np.random.choice(len(target_combinations))
-        target_combination = target_combinations[target_idx]
+        target_visual = []
+        model_visual = []
+        for j in xrange(batch_size):
+            # Sample combination from TARGET
+            target_idx = np.random.choice(len(target_combinations))
+            target_combination = target_combinations[target_idx]
 
-        # Make visual
-        target_visual.append(combination_to_visual(target_combination, target_visual_samplers))
-        #plt.imshow(target_visual.resize(5 * 28, 28))
+            # Make visual
+            target_visual.append(combination_to_visual(target_combination, target_visual_samplers))
+            #plt.imshow(target_visual.resize(5 * 28, 28))
 
-        # Sample combination from MODEL
-        model_idx = np.random.choice(len(model_combinations))
-        model_combination = model_combinations[target_idx]
+            # Sample combination from MODEL
+            model_idx = np.random.choice(len(model_combinations))
+            model_combination = model_combinations[target_idx]
 
-        #!!!!!!!!!!!!! DEBUG, USE TEST SET VISUAL MODEL !!!!!!!!!!!!!
+            # Make visual by sampling from VAEs
+            model_visual.append(combination_to_visual(model_combination, model_visual_samplers))
 
-        # Make visual by sampling from VAEs
-        model_visual.append(combination_to_visual(model_combination, model_visual_samplers))
-        #model_visual.append(combination_to_visual(model_combination, target_visual_samplers))
+        target_visual = torch.cat(target_visual, 0)
+        model_visual = torch.cat(model_visual, 0)
 
-    target_visual = torch.cat(target_visual, 0)
-    model_visual = torch.cat(model_visual, 0)
+        ####################################
+        #  Train discriminator
 
-    ####################################
-    #  Train discriminator
+        # Compute output
+        target_output = discriminator(target_visual)
+        model_output = discriminator(model_visual)
 
-    # Compute output
-    target_output = discriminator(target_visual)
-    model_output = discriminator(model_visual)
+        target_target = torch.ones(len(target_output)) # REAL is ONE, FAKE is ZERO
+        model_target = torch.zeros(len(model_output)) # REAL is ONE, FAKE is ZERO
 
-    target_target = torch.ones(len(target_output)) # REAL is ONE, FAKE is ZERO
-    model_target = torch.zeros(len(model_output)) # REAL is ONE, FAKE is ZERO
+        # Compute loss
+        target_score = criterion(target_output, target_target)
+        model_score = criterion(model_output, model_target)
+        classifier_loss = 0.5 * (target_score + model_score)
+        classifier_accuracy = 0.5 * ((target_output>0.5).float().mean() + (model_output<=0.5).float().mean())
 
-    # Compute loss
-    target_score = criterion(target_output, target_target)
-    model_score = criterion(model_output, model_target)
-    classifier_loss = 0.5 * (target_score + model_score)
-    classifier_accuracy = 0.5 * ((target_output>0.5).float().mean() + (model_output<=0.5).float().mean())
+        # Compute penalty
+        target_penalty = compute_gradient_penalty(discriminator, target_visual)
+        model_penalty = compute_gradient_penalty(discriminator, model_visual)
+        penalty_loss = PENALTY * (target_penalty + model_penalty)
 
-    # Compute penalty
-    target_penalty = compute_gradient_penalty(discriminator, target_visual)
-    model_penalty = compute_gradient_penalty(discriminator, model_visual)
-    penalty_loss = PENALTY * (target_penalty + model_penalty)
+        total_loss = classifier_loss + penalty_loss
 
-    total_loss = classifier_loss + penalty_loss
+        optimizer.zero_grad()
+        total_loss.backward()
+        optimizer.step()
 
-    optimizer.zero_grad()
-    total_loss.backward()
-    optimizer.step()
+        ######################################
+        # Evaluate if it can distinguish constraint while with perfect samples
 
-    ######################################
-    # Log
-    classifier_losses.append(classifier_loss.item())
-    classifier_accuracies.append(classifier_accuracy.item())
-    penalty_losses.append(penalty_loss.item())
-    total_losses.append(total_loss.item())
-    if iteration % 50 == 0:
-        print 'Iteration', iteration
-        print 'Target', target_output.mean().item()
-        print 'Model', model_output.mean().item()
-        print 'Classifier Loss', summarize(classifier_losses)
-        print 'Classifier Accuracies', summarize(classifier_accuracies)
-        print 'Penalty Loss', summarize(penalty_losses)
-        print 'Total Loss', summarize(total_losses)
+        target_visual = []
+        model_visual = []
+        for j in xrange(batch_size):
+            # Sample combination from TARGET
+            target_idx = np.random.choice(len(sum_25.train_positive))
+            target_combination = sum_25.train_positive[target_idx]
+
+            # Make visual
+            target_visual.append(combination_to_visual(target_combination, target_visual_samplers))
+            #plt.imshow(target_visual.resize(5 * 28, 28))
+
+            # Sample combination from MODEL
+            model_idx = np.random.choice(len(uniform.train_positive))
+            model_combination = uniform.train_positive[target_idx]
+
+            # Make visual by sampling from VAEs
+            model_visual.append(combination_to_visual(model_combination, target_visual_samplers))
+
+        target_visual = torch.cat(target_visual, 0)
+        model_visual = torch.cat(model_visual, 0)
+
+        # Compute output
+        eval_target_output = discriminator(target_visual)
+        eval_model_output = discriminator(model_visual)
+
+        # Compute loss
+        eval_classifier_accuracy = 0.5 * ((eval_target_output>0.5).float().mean() + (eval_model_output<=0.5).float().mean())
 
 
+        ######################################
+        # Log
+        classifier_losses.append(classifier_loss.item())
+        classifier_accuracies.append(classifier_accuracy.item())
+        penalty_losses.append(penalty_loss.item())
+        total_losses.append(total_loss.item())
+        eval_classifier_accuracies.append(eval_classifier_accuracy.item())
+        if iteration % 50 == 0:
+            print 'Iteration', iteration
+            print 'Target', target_output.mean().item()
+            print 'Model', model_output.mean().item()
+            print 'Classifier Loss', summarize(classifier_losses)
+            print 'Classifier Accuracies', summarize(classifier_accuracies)
+            print 'Penalty Loss', summarize(penalty_losses)
+            print 'Accuracy with perfect model', summarize(eval_classifier_accuracies)
+            print 'Total Loss', summarize(total_losses)
+except KeyboardInterrupt:
+    print 'interrupted'
