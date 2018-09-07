@@ -8,7 +8,11 @@ import numpy as np
 import time
 import os
 import json
-#import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from scipy.ndimage.filters import gaussian_filter1d
+import math
 
 ###############################
 
@@ -36,7 +40,7 @@ p.MODEL_SYMBOL = 'uniform'
 
 ###### Surrogate task: Classify individual digits
 # if negative, do not learn to classify.
-p.LEARN_TO_CLASSIFY = 0#0.1
+p.LEARN_TO_CLASSIFY = 0.0
 # Batch-size for individual digits
 p.DIGIT_BATCH_SIZE = 12
 
@@ -63,6 +67,8 @@ os.makedirs(run_dir)
 # Dump parameters
 with open('{}/args.json'.format(run_dir),'wb') as fp:
     json.dump(vars(p), fp, indent=4)
+with open('{}.DIVERGENCE'.format(run_dir), 'wb') as fp:
+    pass
 
 
 #############################
@@ -172,6 +178,23 @@ def sample_visual_combination(symbolic, visual, combination_batch_size):
     samples = torch.cat(samples, 0)
     return samples
 
+def export_pdf(fname, stats, smooth_window=21, fontsize=12):
+    stats = vars(stats)
+    width = 3
+    plt.figure()
+    plt.tight_layout()
+    for i, (key, value) in enumerate(stats.items()):
+        # Smooth
+        smoothed = gaussian_filter1d(value, smooth_window)
+
+        plt.subplot(width, width, i + 1)
+        # plt.plot(value)
+        plt.plot(smoothed)
+        plt.xlabel('Iterations', fontsize=fontsize)
+        plt.ylabel(key, fontsize=fontsize)
+
+    plt.savefig(fname)
+
 ##################
 # Load some problems
 uniform = get_problem('uniform', 'int', train_ratio=1.)
@@ -209,19 +232,19 @@ train_iter, test_iter = load_full_mnist_digits(batch_size=p.DIGIT_BATCH_SIZE)
 #####################################################
 # Create visual samplers
 vae_visual_samplers = [ModelVisualSampler(vaes[i]) for i in xrange(10)]
-test_visual_samplers = [DatasetVisualSampler(digit_test_iter[0]) for i in xrange(10)]
+test_visual_samplers = [DatasetVisualSampler(digit_test_iter[i]) for i in xrange(10)]
 
 if p.MODEL_VISUAL == 'test':
     model_visual_samplers = test_visual_samplers
 elif p.MODEL_VISUAL == 'vae':
     model_visual_samplers = vae_visual_samplers
 else:
-    raise ArgumentError()
+    raise ValueError()
 
 if p.TARGET_VISUAL == 'test':
     target_visual_samplers = test_visual_samplers
 else:
-    raise ArgumentError()
+    raise ValueError()
 
 
 ##########################################
@@ -235,8 +258,10 @@ model_symbolic_samplers = get_problem(p.MODEL_SYMBOL, 'int', train_ratio=1.).tra
 
 ##########################################
 # Create discriminator
-DiscriminatorClass = eval(p.ARCHITECTURE)
-discriminator = DiscriminatorClass()
+#DiscriminatorClass = eval(p.ARCHITECTURE)
+#discriminator = DiscriminatorClass()
+discriminator = Discriminator4()
+print discriminator
 optimizer = torch.optim.Adam(discriminator.parameters(), lr=1e-3)
 
 ##########################################
@@ -341,6 +366,10 @@ try:
             # Dump data
             with open('{}/stats.json'.format(run_dir), 'wb') as fp:
                 json.dump(vars(s), fp, indent=4)
+
+            # Export pdf
+            if iteration % 200 == 0:
+                export_pdf('{}/stats.pdf'.format(run_dir), s)
 
 except KeyboardInterrupt:
     print 'interrupted'
