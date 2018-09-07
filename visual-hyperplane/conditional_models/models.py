@@ -104,7 +104,7 @@ class Discriminator2(nn.Module):
         return x
 
 
-class Discriminator3(nn.Module):
+class Discriminator3(Discriminator2):
     def __init__(self):
         nn.Module.__init__(self)
 
@@ -116,11 +116,34 @@ class Discriminator3(nn.Module):
             nn.Linear(20, 20),
         )
         self.merge = nn.Sequential(
-            nn.Linear(20*5, 80),
+            nn.Linear(20*5, 200),
             nn.ReLU(),
-            nn.Linear(80, 20),
+            nn.Linear(200, 200),
+            nn.ReLU(),
+            nn.Linear(200, 200),
+            nn.ReLU(),
+            nn.Linear(200, 1),
+            nn.Sigmoid()
+        )
+        self.classifier = nn.Sequential(
+            nn.ReLU(),
+            nn.Linear(20, 10),
+            nn.LogSoftmax()
+        )
+
+class Discriminator4(Discriminator2):
+    def __init__(self):
+        nn.Module.__init__(self)
+
+        self.shared = nn.Sequential(
+            nn.Linear(784, 400),
+            nn.ReLU(),
+            nn.Linear(400, 20),
             nn.ReLU(),
             nn.Linear(20, 20),
+        )
+        self.merge = nn.Sequential(
+            nn.Linear(5*10, 20),
             nn.ReLU(),
             nn.Linear(20, 1),
             nn.Sigmoid()
@@ -134,16 +157,10 @@ class Discriminator3(nn.Module):
     def forward(self, x):
         x_per_digit = x.view(len(x)*5, -1)
         embeddings = self.shared(x_per_digit)
-        embeddings_merged = embeddings.view(len(x), -1)
-        out = self.merge(embeddings_merged)
+        classified = self.classifier(embeddings)
+        classified_merged = classified.view(len(x), -1)
+        out = self.merge(classified_merged)
         return out
-
-    def classify_digit(self, x):
-        x = x.view(len(x), -1)  # flatten digits
-        x = self.shared(x)
-        x = self.classifier(x)
-        return x
-
 
 def loss_function(recon_x, x, mu, logvar):
     BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), size_average=False)

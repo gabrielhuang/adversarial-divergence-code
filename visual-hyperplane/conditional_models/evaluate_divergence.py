@@ -2,10 +2,68 @@ import sys
 sys.path.append('..')
 import torch
 from torchvision import datasets, transforms
-from models import VAE, loss_function, Discriminator1, Discriminator2
+from models import VAE, loss_function, Discriminator1, Discriminator2, Discriminator3, Discriminator4
 from problems import get_problem
 import numpy as np
+import time
+import os
+import json
 #import matplotlib.pyplot as plt
+
+###############################
+
+# All parameters go here
+class Parameters(object):
+    pass
+
+
+class Stats(object):
+    pass
+
+
+p = Parameters()
+
+
+####### Which distributions
+# Visual conditional models
+p.TARGET_VISUAL = 'test'
+p.MODEL_VISUAL = 'test'
+p.DEBUG_TEST = True
+
+# Symbolic conditional models
+p.TARGET_SYMBOL = 'sum_25'
+p.MODEL_SYMBOL = 'uniform'
+
+###### Surrogate task: Classify individual digits
+# if negative, do not learn to classify.
+p.LEARN_TO_CLASSIFY = 0#0.1
+# Batch-size for individual digits
+p.DIGIT_BATCH_SIZE = 12
+
+###### GAN training
+# Total training iterations
+p.ITERATIONS = 4000
+
+# Gradient penalty
+p.PENALTY = 0.  # 10.
+
+# Batch-size for visual combinations
+p.COMBINATION_BATCH_SIZE = 12
+
+###### Architecture
+p.ARCHITECTURE = 'Discriminator4'
+
+
+#############################
+# Create output directory
+run_dir = 'runs/{}'.format(time.strftime("run-%Y.%m.%d-%H.%M.%S"))
+print 'Creating', run_dir
+os.makedirs(run_dir)
+
+# Dump parameters
+with open('{}/args.json'.format(run_dir),'wb') as fp:
+    json.dump(vars(p), fp, indent=4)
+
 
 #############################
 # Combination to Visual
@@ -41,9 +99,25 @@ def load_one_mnist_digit(digit, train, debug=False):
                 break
     return test_digits
 
+def make_infinite(iterable):
+    while True:
+        for x in iterable:
+            yield x
+
+# Standard MNIST digit
+def load_full_mnist_digits(batch_size):
+    train_iter = make_infinite(torch.utils.data.DataLoader(
+        datasets.MNIST('../data', train=True, download=True,
+                       transform=transforms.ToTensor()),
+                       batch_size=batch_size))
+    test_iter = make_infinite(torch.utils.data.DataLoader(
+        datasets.MNIST('../data', train=False, download=True,
+                       transform=transforms.ToTensor()),
+                       batch_size=batch_size))
+    return train_iter, test_iter
+
 
 def compute_gradient_penalty(netD, data):
-
     # Dunnow how to do this better with detach
     data = torch.autograd.Variable(data.detach(), requires_grad=True)
     outputs = netD(data)
@@ -61,13 +135,44 @@ def compute_gradient_penalty(netD, data):
     relaxed_gradient_penalty = (gradients**2).sum() / float(len(data))
     return relaxed_gradient_penalty
 
+
+class DatasetVisualSampler(object):
+    def __init__(self, digit_iter):
+        self.digit_iter = digit_iter
+
+    def __call__(self):
+            return self.digit_iter.next()[0]
+
+
+class ModelVisualSampler(object):
+    def __init__(self, vae, batch_size=64):
+        self.idx = batch_size
+        self.batch_size = batch_size
+        self.vae = vae
+
+    def __call__(self):  # return one sample
+        if self.idx >= self.batch_size:
+            # Regenerate new
+            self.cache = self.vae.generate(self.batch_size)
+            self.idx = 0
+        sample = self.cache[self.idx][None, ...]  # preserve dims
+        self.idx += 1
+        return sample.detach()
+
+
+def sample_visual_combination(symbolic, visual, combination_batch_size):
+    samples = []
+    for j in xrange(combination_batch_size):
+        # Sample combination from symbolic
+        combination_idx = np.random.choice(len(symbolic))
+        combination = symbolic[combination_idx]
+
+        # Make visual
+        samples.append(combination_to_visual(combination, visual))
+    samples = torch.cat(samples, 0)
+    return samples
+
 ##################
-
-
-p = get_problem('sum_25', 'int', train_ratio=1.)
-
-
-#####################################################
 # Load some problems
 uniform = get_problem('uniform', 'int', train_ratio=1.)
 sum_25 = get_problem('sum_25', 'int', train_ratio=1.)
@@ -86,114 +191,80 @@ for i in xrange(10):
     state_dict = torch.load('epoch_{}/digit_{}_epoch_{}.pth'.format(EPOCH, i, EPOCH))
     vae.load_state_dict(state_dict)
     vaes[i] = vae
-
-
 #####################################################
 print 'Loading MNIST digits'
 
-# Load all MNIST digits
-test_digits = {}
-test_loaders = {}
+# Load individual MNIST digits
+digit_test_iter = {}
 for i in xrange(10):
     print 'Loading digit', i
-    #test_digit = load_one_mnist_digit(i, train=False, debug=True)
-    test_digit = load_one_mnist_digit(i, train=False, debug=False)
-    test_digits[i] = test_digit
+    test_digit = load_one_mnist_digit(i, train=False, debug=p.DEBUG_TEST)
+    digit_test_iter[i] = make_infinite(
+        torch.utils.data.DataLoader(test_digit, batch_size=1, shuffle=True))
+#####################################################
 
-    test_loader = torch.utils.data.DataLoader(test_digit, batch_size=1, shuffle=True)
-    test_loaders[i] = test_loader
-
+# Load all MNIST digits
+train_iter, test_iter = load_full_mnist_digits(batch_size=p.DIGIT_BATCH_SIZE)
 
 #####################################################
-def create_target_visual_sampler(i, test_loaders):
-    def visual_sampler():
-        return iter(test_loaders[int(i)]).next()[0]
+# Create visual samplers
+vae_visual_samplers = [ModelVisualSampler(vaes[i]) for i in xrange(10)]
+test_visual_samplers = [DatasetVisualSampler(digit_test_iter[0]) for i in xrange(10)]
 
-    return visual_sampler
-target_visual_samplers = [create_target_visual_sampler(i, test_loaders) for i in xrange(10)]
+if p.MODEL_VISUAL == 'test':
+    model_visual_samplers = test_visual_samplers
+elif p.MODEL_VISUAL == 'vae':
+    model_visual_samplers = vae_visual_samplers
+else:
+    raise ArgumentError()
 
-# Build target
-def create_model_visual_sampler(i, test_loaders):
-    def visual_sampler():
-        return vaes[i].generate(1)[0,0]
-
-    return visual_sampler
-
-class ModelVisualSampler(object):
-    def __init__(self, vae, batch_size=64):
-        self.idx = batch_size
-        self.batch_size = batch_size
-        self.vae = vae
-
-    def __call__(self):  # return one sample
-        if self.idx >= self.batch_size:
-            # Regenerate new
-            self.cache = self.vae.generate(self.batch_size)
-            self.idx = 0
-        sample = self.cache[self.idx][None, ...]  # preserve dims
-        self.idx += 1
-        return sample.detach()
-
-model_visual_samplers = [ModelVisualSampler(vaes[i]) for i in xrange(10)]
+if p.TARGET_VISUAL == 'test':
+    target_visual_samplers = test_visual_samplers
+else:
+    raise ArgumentError()
 
 
 ##########################################
+# Create symbolic samplers
+
 # Pick target distribution
-target_combinations = sum_25.train_positive
+target_symbolic_samplers = get_problem(p.TARGET_SYMBOL, 'int', train_ratio=1.).train_positive
 
 # Pick model joint distribution
-model_combinations = uniform.train_positive
-#model_combinations = sum_25.train_positive
+model_symbolic_samplers = get_problem(p.MODEL_SYMBOL, 'int', train_ratio=1.).train_positive
 
 ##########################################
 # Create discriminator
-#discriminator = Discriminator1(with_sigmoid=True)
-discriminator = Discriminator2()
+DiscriminatorClass = eval(p.ARCHITECTURE)
+discriminator = DiscriminatorClass()
 optimizer = torch.optim.Adam(discriminator.parameters(), lr=1e-3)
 
 ##########################################
+# Actual training code
+
 criterion = torch.nn.BCELoss()
 
-ITERATIONS = 1000
-classifier_losses = []
-classifier_accuracies = []
-penalty_losses = []
-total_losses = []
-eval_classifier_accuracies = []
-PENALTY = 10.
-batch_size = 32
+s = Stats()
+s.classifier_losses = []
+s.classifier_accuracies = []
+s.penalty_losses = []
+s.total_losses = []
+s.eval_classifier_accuracies = []
+s.digit_losses = []
+s.digit_accuracies = []
+
+nll_loss = torch.nn.NLLLoss()
 
 def summarize(u, suffix=50):
     v = u[-min(suffix, len(u)):]
     return '{:.3f} +/- {:.3f}'.format(np.mean(v), np.std(v)/np.sqrt(len(v)))
 
 try:
-    for iteration in xrange(ITERATIONS):
+    for iteration in xrange(p.ITERATIONS):
         ####################################
-        #  Sample data
-
-        target_visual = []
-        model_visual = []
-        for j in xrange(batch_size):
-            # Sample combination from TARGET
-            target_idx = np.random.choice(len(target_combinations))
-            target_combination = target_combinations[target_idx]
-
-            # Make visual
-            target_visual.append(combination_to_visual(target_combination, target_visual_samplers))
-            #plt.imshow(target_visual.resize(5 * 28, 28))
-
-            # Sample combination from MODEL
-            model_idx = np.random.choice(len(model_combinations))
-            model_combination = model_combinations[target_idx]
-
-            # DEBUG, TARGET
-            # Make visual by sampling from VAEs
-            model_visual.append(combination_to_visual(model_combination, model_visual_samplers))
-            #model_visual.append(combination_to_visual(model_combination, target_visual_samplers))
-
-        target_visual = torch.cat(target_visual, 0)
-        model_visual = torch.cat(model_visual, 0)
+        # Sample visual combination
+        target_visual = sample_visual_combination(target_symbolic_samplers, target_visual_samplers, p.COMBINATION_BATCH_SIZE)
+        model_visual = sample_visual_combination(model_symbolic_samplers, model_visual_samplers, p.COMBINATION_BATCH_SIZE)
 
         ####################################
         #  Train discriminator
@@ -214,37 +285,29 @@ try:
         # Compute penalty
         target_penalty = compute_gradient_penalty(discriminator, target_visual)
         model_penalty = compute_gradient_penalty(discriminator, model_visual)
-        penalty_loss = PENALTY * (target_penalty + model_penalty)
+        penalty_loss = p.PENALTY * (target_penalty + model_penalty)
 
         total_loss = classifier_loss + penalty_loss
+
+        # Learn to classify?
+        if p.LEARN_TO_CLASSIFY >= 0.:
+            data, target = train_iter.next()
+            output = discriminator.classify_digit(data)
+            digit_loss = nll_loss(output, target)
+            s.digit_losses.append(digit_loss.item())
+            total_loss = total_loss + p.LEARN_TO_CLASSIFY * digit_loss
+            digit_accuracy = (output.argmax(1) == target).float().mean()
+            s.digit_accuracies.append(digit_accuracy.item())
 
         optimizer.zero_grad()
         total_loss.backward()
         optimizer.step()
 
         ######################################
-        # Evaluate if it can distinguish constraint when using perfect samples
-
-        target_visual = []
-        model_visual = []
-        for j in xrange(batch_size):
-            # Sample combination from TARGET
-            target_idx = np.random.choice(len(sum_25.train_positive))
-            target_combination = sum_25.train_positive[target_idx]
-
-            # Make visual
-            target_visual.append(combination_to_visual(target_combination, target_visual_samplers))
-            #plt.imshow(target_visual.resize(5 * 28, 28))
-
-            # Sample combination from MODEL
-            model_idx = np.random.choice(len(uniform.train_positive))
-            model_combination = uniform.train_positive[target_idx]
-
-            # Make visual by sampling from VAEs
-            model_visual.append(combination_to_visual(model_combination, target_visual_samplers))
-
-        target_visual = torch.cat(target_visual, 0)
-        model_visual = torch.cat(model_visual, 0)
+        # Evaluate if it can distinguish constraint when using perfect visual samples
+        # difference with training is model_visual_samplers are replaced with target_visual_samplers
+        eval_target_visual = sample_visual_combination(target_symbolic_samplers, target_visual_samplers, p.COMBINATION_BATCH_SIZE)
+        eval_model_visual = sample_visual_combination(model_symbolic_samplers, target_visual_samplers, p.COMBINATION_BATCH_SIZE)
 
         # Compute output
         eval_target_output = discriminator(target_visual)
@@ -253,22 +316,31 @@ try:
         # Compute loss
         eval_classifier_accuracy = 0.5 * ((eval_target_output>0.5).float().mean() + (eval_model_output<=0.5).float().mean())
 
-
         ######################################
         # Log
-        classifier_losses.append(classifier_loss.item())
-        classifier_accuracies.append(classifier_accuracy.item())
-        penalty_losses.append(penalty_loss.item())
-        total_losses.append(total_loss.item())
-        eval_classifier_accuracies.append(eval_classifier_accuracy.item())
+        s.classifier_losses.append(classifier_loss.item())
+        s.classifier_accuracies.append(classifier_accuracy.item())
+        s.penalty_losses.append(penalty_loss.item())
+        s.total_losses.append(total_loss.item())
+        s.eval_classifier_accuracies.append(eval_classifier_accuracy.item())
         if iteration % 50 == 0:
-            print 'Iteration', iteration
-            print 'Target', target_output.mean().item()
-            print 'Model', model_output.mean().item()
-            print 'Classifier Loss', summarize(classifier_losses)
-            print 'Classifier Accuracies', summarize(classifier_accuracies)
-            print 'Penalty Loss', summarize(penalty_losses)
-            print 'Accuracy with perfect model', summarize(eval_classifier_accuracies)
-            print 'Total Loss', summarize(total_losses)
+            print '\nIteration', iteration
+            #print 'Target', target_output.mean().item()
+            #print 'Model', model_output.mean().item()
+            print 'General divergence'
+            print '\tClassifier Loss', summarize(s.classifier_losses)
+            print '\tClassifier Accuracies', summarize(s.classifier_accuracies)
+            print '\tPenalty Loss', summarize(s.penalty_losses)
+            print 'Detect constraint'
+            print '\tAccuracy with perfect model', summarize(s.eval_classifier_accuracies)
+            print 'Individual digit classification'
+            print '\tDigit losses', summarize(s.digit_losses)
+            print '\tDigit accuracies', summarize(s.digit_accuracies)
+            print 'Total Loss', summarize(s.total_losses)
+
+            # Dump data
+            with open('{}/stats.json'.format(run_dir), 'wb') as fp:
+                json.dump(vars(s), fp, indent=4)
+
 except KeyboardInterrupt:
     print 'interrupted'
