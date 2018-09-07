@@ -21,8 +21,8 @@ from platform import system as platform
 root_dir = 'runs/'
 
 # Get all subfolders
-subfolders = [o for o in os.listdir(root_dir)
-              if os.path.isdir(os.path.join(root_dir,o))]
+subfolders = list(sorted([o for o in os.listdir(root_dir)
+              if os.path.isdir(os.path.join(root_dir,o))]))
 print 'subfolders', subfolders
 
 # For each subfolder get arguments

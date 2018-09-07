@@ -32,7 +32,9 @@ p = Parameters()
 # Visual conditional models
 p.TARGET_VISUAL = 'test'
 p.MODEL_VISUAL = 'test'
-p.DEBUG_TEST = True
+#p.MODEL_VISUAL = 'vae'
+p.DEBUG_TEST = False
+#p.DEBUG_TEST = True
 
 # Symbolic conditional models
 p.TARGET_SYMBOL = 'sum_25'
@@ -40,7 +42,8 @@ p.MODEL_SYMBOL = 'uniform'
 
 ###### Surrogate task: Classify individual digits
 # if negative, do not learn to classify.
-p.LEARN_TO_CLASSIFY = 0.0
+#p.LEARN_TO_CLASSIFY = 0.0
+p.LEARN_TO_CLASSIFY = 0.1
 # Batch-size for individual digits
 p.DIGIT_BATCH_SIZE = 12
 
@@ -335,8 +338,8 @@ try:
         eval_model_visual = sample_visual_combination(model_symbolic_samplers, target_visual_samplers, p.COMBINATION_BATCH_SIZE)
 
         # Compute output
-        eval_target_output = discriminator(target_visual)
-        eval_model_output = discriminator(model_visual)
+        eval_target_output = discriminator(eval_target_visual)
+        eval_model_output = discriminator(eval_model_visual)
 
         # Compute loss
         eval_classifier_accuracy = 0.5 * ((eval_target_output>0.5).float().mean() + (eval_model_output<=0.5).float().mean())
