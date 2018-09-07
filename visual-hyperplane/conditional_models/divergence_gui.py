@@ -10,6 +10,7 @@ from matplotlib import style
 style.use('ggplot')
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.ndimage.filters import gaussian_filter1d
 
 
 from platform import system as platform
@@ -100,6 +101,11 @@ def update():
         args_text = u'\n'.join(args_text)
         argsBox.configure(text=args_text)
 
+    # Smooth if needed
+    smooth_window = smoothingScale.get()
+    smooth_window = np.clip(1+int((smooth_window-1)/2)*2, 1, 101)
+    print 'Smooth window', smooth_window
+
     # Update plot if plot is selected
     if stat_listbox.curselection() and run_listbox.curselection():
         ax.cla()
@@ -108,7 +114,10 @@ def update():
         print 'Plotting', stat_name
         for run in run_listbox.curselection():
             stat = stats[run][stat_name]
-            ax.plot(stat, label=subfolder[run])
+            # Smooth the stat
+            smoothed = gaussian_filter1d(stat, smooth_window)
+
+            ax.plot(smoothed, label=subfolders[run])
             ax.set_xlabel('iterations')
             ax.set_title(stat_name)
         ax.legend()
@@ -151,6 +160,14 @@ canvas.get_tk_widget().pack(side=TOP, fill=tk.BOTH, expand=True)
 toolbar = NavigationToolbar2TkAgg(canvas, plotFrame)
 toolbar.update()
 canvas._tkcanvas.pack(side=TOP, fill=tk.BOTH, expand=True)
+
+# Smoothing
+w = Label(plotFrame, text="Smoothing window size:")
+w.pack(side=TOP)
+smoothingScale = Scale(plotFrame, from_=1, to=101, resolution=1, orient=HORIZONTAL)
+smoothingScale.pack(side=TOP)
+smoothingScale.set(21)
+smoothingScale.bind("<ButtonRelease-1>", lambda x:update())
 
 mainloop()
 
