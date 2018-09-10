@@ -31,8 +31,8 @@ p = Parameters()
 ####### Which distributions
 # Visual conditional models
 p.TARGET_VISUAL = 'test'
-p.MODEL_VISUAL = 'test'
-#p.MODEL_VISUAL = 'vae'
+#p.MODEL_VISUAL = 'test'
+p.MODEL_VISUAL = 'vae'
 p.DEBUG_TEST = False
 #p.DEBUG_TEST = True
 
@@ -43,21 +43,26 @@ p.MODEL_SYMBOL = 'uniform'
 ###### Surrogate task: Classify individual digits
 # if negative, do not learn to classify.
 #p.LEARN_TO_CLASSIFY = 0.0
-p.LEARN_TO_CLASSIFY = 0.1
+#p.LEARN_TO_CLASSIFY = 0.1
+p.LEARN_TO_CLASSIFY = 1.
 # Batch-size for individual digits
-p.DIGIT_BATCH_SIZE = 12
+p.DIGIT_BATCH_SIZE = 64
+
+p.ONLY_CLASSIFY = False  # no training other than classify (for debbuging)
 
 ###### GAN training
 # Total training iterations
-p.ITERATIONS = 4000
+p.ITERATIONS = 10000
 
 # Gradient penalty
 p.PENALTY = 0.  # 10.
+p.LR = 1e-3  # Adam learning rate
 
 # Batch-size for visual combinations
 p.COMBINATION_BATCH_SIZE = 12
 
 ###### Architecture
+#p.ARCHITECTURE = 'Discriminator2'
 p.ARCHITECTURE = 'Discriminator4'
 
 
@@ -261,11 +266,10 @@ model_symbolic_samplers = get_problem(p.MODEL_SYMBOL, 'int', train_ratio=1.).tra
 
 ##########################################
 # Create discriminator
-#DiscriminatorClass = eval(p.ARCHITECTURE)
-#discriminator = DiscriminatorClass()
-discriminator = Discriminator4()
+DiscriminatorClass = eval(p.ARCHITECTURE)
+discriminator = DiscriminatorClass()
 print discriminator
-optimizer = torch.optim.Adam(discriminator.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(discriminator.parameters(), lr=p.LR)
 
 ##########################################
 # Actual training code
@@ -278,8 +282,11 @@ s.classifier_accuracies = []
 s.penalty_losses = []
 s.total_losses = []
 s.eval_classifier_accuracies = []
+s.eval_calibrated_accuracies = []
 s.digit_losses = []
 s.digit_accuracies = []
+s.eval_target_outputs = []
+s.eval_model_outputs = []
 
 nll_loss = torch.nn.NLLLoss()
 
@@ -323,9 +330,13 @@ try:
             output = discriminator.classify_digit(data)
             digit_loss = nll_loss(output, target)
             s.digit_losses.append(digit_loss.item())
-            total_loss = total_loss + p.LEARN_TO_CLASSIFY * digit_loss
             digit_accuracy = (output.argmax(1) == target).float().mean()
             s.digit_accuracies.append(digit_accuracy.item())
+
+            if p.ONLY_CLASSIFY:
+                total_loss = digit_loss
+            else:
+                total_loss = total_loss + p.LEARN_TO_CLASSIFY * digit_loss
 
         optimizer.zero_grad()
         total_loss.backward()
@@ -343,6 +354,10 @@ try:
 
         # Compute loss
         eval_classifier_accuracy = 0.5 * ((eval_target_output>0.5).float().mean() + (eval_model_output<=0.5).float().mean())
+        #eval_classifier_accuracy = 0.5 * ((eval_target_output>0.5).float().mean() + (eval_model_output<=0.5).float().mean())
+        thresholds = torch.linspace(0, 1, 1000)
+        eval_calibrated_accuracy = 0.5 * torch.max((eval_target_output > thresholds).float().mean(0)
+                  + (eval_model_output <= thresholds).float().mean(0))
 
         ######################################
         # Log
@@ -351,6 +366,9 @@ try:
         s.penalty_losses.append(penalty_loss.item())
         s.total_losses.append(total_loss.item())
         s.eval_classifier_accuracies.append(eval_classifier_accuracy.item())
+        s.eval_calibrated_accuracies.append(eval_calibrated_accuracy.item())
+        s.eval_target_outputs.append(eval_target_output.mean().item())
+        s.eval_model_outputs.append(eval_model_output.mean().item())
         if iteration % 50 == 0:
             print '\nIteration', iteration
             #print 'Target', target_output.mean().item()
@@ -361,6 +379,9 @@ try:
             print '\tPenalty Loss', summarize(s.penalty_losses)
             print 'Detect constraint'
             print '\tAccuracy with perfect model', summarize(s.eval_classifier_accuracies)
+            print '\tAccuracy with perfect model', summarize(s.eval_calibrated_accuracies)
+            print '\tEval Target', summarize(s.eval_target_outputs)
+            print '\tEval Model', summarize(s.eval_model_outputs)
             print 'Individual digit classification'
             print '\tDigit losses', summarize(s.digit_losses)
             print '\tDigit accuracies', summarize(s.digit_accuracies)
@@ -370,9 +391,6 @@ try:
             with open('{}/stats.json'.format(run_dir), 'wb') as fp:
                 json.dump(vars(s), fp, indent=4)
 
-            # Export pdf
-            if iteration % 200 == 0:
-                export_pdf('{}/stats.pdf'.format(run_dir), s)
 
 except KeyboardInterrupt:
     print 'interrupted'

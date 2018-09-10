@@ -17,33 +17,35 @@ from platform import system as platform
 
 # set up your Tk Frame and whatnot here...
 
-
 root_dir = 'runs/'
 
-# Get all subfolders
-subfolders = list(sorted([o for o in os.listdir(root_dir)
-              if os.path.isdir(os.path.join(root_dir,o))]))
-print 'subfolders', subfolders
+def sync_from_disk():
+    global subfolders, stats, all_stats, args
 
-# For each subfolder get arguments
-args = []
-for subfolder in subfolders:
-    path = os.path.join(root_dir, subfolder)
-    with open('{}/args.json'.format(path), 'rb') as fp:
-        arg = json.load(fp)
-        args.append(arg)
+    # Get all subfolders
+    subfolders = list(sorted([o for o in os.listdir(root_dir)
+                  if os.path.isdir(os.path.join(root_dir,o))]))
+    print 'subfolders', subfolders
 
-# For each subfolder get stats
-stats = []
-all_stats = set()
-for subfolder in subfolders:
-    path = os.path.join(root_dir, subfolder)
-    with open('{}/stats.json'.format(path), 'rb') as fp:
-        stat = json.load(fp)
-        stats.append(stat)
-        all_stats.update(stat)
-all_stats = list(sorted(all_stats))
-print 'All stats', all_stats
+    # For each subfolder get arguments
+    args = []
+    for subfolder in subfolders:
+        path = os.path.join(root_dir, subfolder)
+        with open('{}/args.json'.format(path), 'rb') as fp:
+            arg = json.load(fp)
+            args.append(arg)
+
+    # For each subfolder get stats
+    stats = []
+    all_stats = set()
+    for subfolder in subfolders:
+        path = os.path.join(root_dir, subfolder)
+        with open('{}/stats.json'.format(path), 'rb') as fp:
+            stat = json.load(fp)
+            stats.append(stat)
+            all_stats.update(stat)
+    all_stats = list(sorted(all_stats))
+    print 'All stats', all_stats
 
 
 from Tkinter import *
@@ -127,20 +129,33 @@ def update():
 w = Label(selectFrame, text="List of runs:")
 w.pack()
 
+
 run_listbox = Listbox(selectFrame, selectmode=EXTENDED, exportselection=0)
-run_listbox.pack(side=TOP)
-for subfolder in subfolders:
-    run_listbox.insert(END, subfolder)
 run_listbox.bind('<<ListboxSelect>>', run_update)
 
 w = Label(selectFrame, text="Stats:")
 w.pack()
 
 stat_listbox = Listbox(selectFrame, selectmode=BROWSE, exportselection=0)
-stat_listbox.pack(side=TOP)
-for stat in all_stats:
-    stat_listbox.insert(END, stat)
 stat_listbox.bind('<<ListboxSelect>>', stat_update)
+
+# Populate listbox
+def populate_listboxes():
+    run_listbox.delete(0, END)
+    run_listbox.pack(side=TOP)
+    for subfolder in subfolders:
+        run_listbox.insert(END, subfolder)
+
+    stat_listbox.delete(0, END)
+    stat_listbox.pack(side=TOP)
+    for stat in all_stats:
+        stat_listbox.insert(END, stat)
+
+def refresh():
+    sync_from_disk()
+    populate_listboxes()
+
+
 
 argsBox = Message(selectFrame, text="details", width=300)
 argsBox.pack(side=BOTTOM)
@@ -168,6 +183,13 @@ smoothingScale = Scale(plotFrame, from_=1, to=101, resolution=1, orient=HORIZONT
 smoothingScale.pack(side=TOP)
 smoothingScale.set(21)
 smoothingScale.bind("<ButtonRelease-1>", lambda x:update())
+
+
+# Reload button
+w = Button(selectFrame, text="Refresh", command=refresh)
+w.pack(side=TOP)
+
+refresh()  # load everything once
 
 mainloop()
 
