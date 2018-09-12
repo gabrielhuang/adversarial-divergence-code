@@ -62,8 +62,8 @@ p.LR = 1e-3  # Adam learning rate
 p.COMBINATION_BATCH_SIZE = 12
 
 ###### Architecture
-#p.ARCHITECTURE = 'Discriminator2'
-p.ARCHITECTURE = 'Discriminator4'
+p.ARCHITECTURE = 'Discriminator2'
+#p.ARCHITECTURE = 'Discriminator4'
 
 
 #############################
@@ -285,6 +285,8 @@ s.eval_classifier_accuracies = []
 s.eval_calibrated_accuracies = []
 s.digit_losses = []
 s.digit_accuracies = []
+s.model_digit_losses = []
+s.model_digit_accuracies = []
 s.eval_target_outputs = []
 s.eval_model_outputs = []
 
@@ -354,10 +356,20 @@ try:
 
         # Compute loss
         eval_classifier_accuracy = 0.5 * ((eval_target_output>0.5).float().mean() + (eval_model_output<=0.5).float().mean())
-        #eval_classifier_accuracy = 0.5 * ((eval_target_output>0.5).float().mean() + (eval_model_output<=0.5).float().mean())
         thresholds = torch.linspace(0, 1, 1000)
         eval_calibrated_accuracy = 0.5 * torch.max((eval_target_output > thresholds).float().mean(0)
                   + (eval_model_output <= thresholds).float().mean(0))
+
+        ######################################
+        # Evaluate classification accuracy on model distribution
+        target = torch.LongTensor(list(range(10))*6)
+        individual_visual = combination_to_visual(target, model_visual_samplers)
+        individual_visual = individual_visual.view(-1, 1, 28, 28)
+        output = discriminator.classify_digit(individual_visual)
+        digit_loss = nll_loss(output, target)
+        s.model_digit_losses.append(digit_loss.item())
+        digit_accuracy = (output.argmax(1) == target).float().mean()
+        s.model_digit_accuracies.append(digit_accuracy.item())
 
         ######################################
         # Log
@@ -385,6 +397,8 @@ try:
             print 'Individual digit classification'
             print '\tDigit losses', summarize(s.digit_losses)
             print '\tDigit accuracies', summarize(s.digit_accuracies)
+            print '\tModel digit losses', summarize(s.model_digit_losses)
+            print '\tModel digit accuracies', summarize(s.model_digit_accuracies)
             print 'Total Loss', summarize(s.total_losses)
 
             # Dump data
