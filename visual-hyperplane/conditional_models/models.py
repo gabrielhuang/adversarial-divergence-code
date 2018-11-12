@@ -162,6 +162,50 @@ class Discriminator4(Discriminator2):
         out = self.merge(classified_merged)
         return out
 
+
+class Discriminator4exp(Discriminator4):
+
+    def forward(self, x):
+        x_per_digit = x.view(len(x)*5, -1)
+        embeddings = self.shared(x_per_digit)
+        classified = self.classifier(embeddings)
+        classified = classified.exp()
+        classified_merged = classified.view(len(x), -1)
+        out = self.merge(classified_merged)
+        return out
+
+
+class Discriminator4real(Discriminator2):
+    def __init__(self):
+        nn.Module.__init__(self)
+
+        self.shared = nn.Sequential(
+            nn.Linear(784, 400),
+            nn.ReLU(),
+            nn.Linear(400, 20),
+            nn.ReLU(),
+            nn.Linear(20, 20),
+        )
+        self.merge = nn.Sequential(
+            nn.Linear(5*10, 20),
+            nn.ReLU(),
+            nn.Linear(20, 1),
+            nn.Sigmoid()
+        )
+        self.classifier = nn.Sequential(
+            nn.ReLU(),
+            nn.Linear(20, 1),
+        )
+
+    def forward(self, x):
+        x_per_digit = x.view(len(x)*5, -1)
+        embeddings = self.shared(x_per_digit)
+        classified = self.classifier(embeddings)
+        classified_merged = classified.view(len(x), -1)
+        out = self.merge(classified_merged)
+        return out
+
+
 def loss_function(recon_x, x, mu, logvar):
     BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), size_average=False)
 

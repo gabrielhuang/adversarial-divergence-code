@@ -126,7 +126,7 @@ def update():
         canvas.draw()
 
 
-w = Label(selectFrame, text="List of runs:")
+w = Label(selectFrame, text="List of old_runs_2:")
 w.pack()
 
 
