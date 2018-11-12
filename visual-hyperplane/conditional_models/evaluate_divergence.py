@@ -60,8 +60,8 @@ p = Parameters()
 # Train/Test Ratio
 p.TRAIN_RATIO = 0.5
 
-p.DEBUG_TEST = True
-print 'Warning DEBUG'
+p.DEBUG_TEST = False
+#print 'Warning DEBUG'
 
 ###### Surrogate task: Classify individual digits
 # if negative, do not learn to classify.
