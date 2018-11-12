@@ -65,6 +65,12 @@ def get_problem(CONSTRAINT, ENCODING_MODE, train_ratio=0.1):
         combinations_set = set(map(tuple, combinations))
         non_combinations = np.asarray([c for c in uniform if tuple(c) not in combinations_set])
         negative = non_combinations
+    elif CONSTRAINT == 'non_25':
+        combinations = np.asarray(generate_combinations(25, range(10), 5))
+        negative = combinations
+        combinations_set = set(map(tuple, combinations))
+        non_combinations = np.asarray([c for c in uniform if tuple(c) not in combinations_set])
+        positive = non_combinations
     elif CONSTRAINT == 'uniform':
         positive = uniform
         negative = np.zeros((0, 5), dtype=int)
@@ -88,7 +94,7 @@ def get_problem(CONSTRAINT, ENCODING_MODE, train_ratio=0.1):
     else: # positive, negative must be Long before that
         positive = to_onehot(positive)
         negative = to_onehot(negative)
-        
+
     p.constraint = CONSTRAINT
     p.encoding_mode = ENCODING_MODE
         
