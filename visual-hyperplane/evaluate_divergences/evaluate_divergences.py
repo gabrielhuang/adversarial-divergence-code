@@ -1,9 +1,8 @@
 import sys
 sys.path.append('..')
+
 import torch
 from torchvision import datasets, transforms
-from models import VAE, loss_function, Discriminator1, Discriminator2, Discriminator3, Discriminator4
-from problems import get_problem
 import numpy as np
 import time
 import os
@@ -12,7 +11,9 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.ndimage.filters import gaussian_filter1d
-import math
+
+from common.models import VAE, Discriminator2, Discriminator4
+from common.problems import get_problem
 
 ###############################
 
@@ -60,7 +61,8 @@ p = Parameters()
 # Train/Test Ratio
 p.TRAIN_RATIO = 0.5
 
-p.DEBUG_TEST = False
+#p.DEBUG_TEST = False
+p.DEBUG_TEST = True
 #print 'Warning DEBUG'
 
 ###### Surrogate task: Classify individual digits
