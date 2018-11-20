@@ -2,13 +2,13 @@ from __future__ import print_function
 import argparse
 import torch
 import torch.utils.data
-from torch import nn, optim
+from torch import optim
 from torch.nn import functional as F
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
 import os
 
-from models import VAE
+from common.models import VAE
 
 
 parser = argparse.ArgumentParser(description='VAE MNIST Example')

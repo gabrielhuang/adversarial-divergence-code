@@ -6,7 +6,7 @@ import sys
 import math
 from scipy.ndimage.filters import gaussian_filter1d
 
-#sys.argv += ['runs/run-2018.09.07-15.41.17.DIVERGENCE']
+#sys.argv += ['old_runs_2/run-2018.09.07-15.41.17.DIVERGENCE']
 
 if len(sys.argv) != 2:
     raise ValueError('usage: {} file.DIVERGENCE'.format(sys.argv[0]))
