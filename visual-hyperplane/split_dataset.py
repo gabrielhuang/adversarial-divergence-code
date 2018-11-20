@@ -1,5 +1,5 @@
 import argparse
-import cPickloe as pickle
+import cPickle as pickle
 import hyperplane_dataset
 
 parser = argparse.ArgumentParser(description='Split dataset')
