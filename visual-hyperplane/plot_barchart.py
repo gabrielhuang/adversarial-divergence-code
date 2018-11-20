@@ -6,7 +6,7 @@ import numpy as np
 import hyperplane_dataset
 from tqdm import tqdm
 
-# How many runs? (samples will be divided by that number)
+# How many old_runs_2? (samples will be divided by that number)
 n_runs = 5
 n_points = 30
 
@@ -40,7 +40,7 @@ gan_sum = gan_digits.sum(axis=1)
 nb_samples = len(vae_digits)
 flat_dataset = np.array(full_dataset.hyperplane_dataset.combinations).flatten()
 samples_per_run = nb_samples / n_runs
-print 'Going to do {} runs of {} samples'.format(n_runs, samples_per_run)
+print 'Going to do {} old_runs_2 of {} samples'.format(n_runs, samples_per_run)
 
 digits, freq = np.unique(flat_dataset, return_counts=True)
 freq = freq / float(len(flat_dataset))
