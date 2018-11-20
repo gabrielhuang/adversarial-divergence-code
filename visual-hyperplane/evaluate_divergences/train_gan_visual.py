@@ -40,8 +40,10 @@ parser.add_argument('--manualSeed', type=int, help='manual seed')
 opt = parser.parse_args()
 print(opt)
 
+run_dir = '{}/digit_{}'.format(opt.outf, opt.digit)
+
 try:
-    os.makedirs(opt.outf)
+    os.makedirs(run_dir)
 except OSError:
     pass
 
@@ -191,13 +193,13 @@ for epoch in range(opt.niter):
                  errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
         if i % 100 == 0:
             vutils.save_image(real_cpu,
-                    '%s/real_samples.png' % opt.outf,
+                    '%s/real_samples.png' % run_dir,
                     normalize=True)
             fake = netG(fixed_noise)
             vutils.save_image(fake.detach(),
-                    '%s/fake_samples_epoch_%03d.png' % (opt.outf, epoch),
+                    '%s/fake_samples_epoch_%03d.png' % (run_dir, epoch),
                     normalize=True)
 
     # do checkpointing
-    torch.save(netG.state_dict(), '%s/netG_epoch_%d.pth' % (opt.outf, epoch))
-    torch.save(netD.state_dict(), '%s/netD_epoch_%d.pth' % (opt.outf, epoch))
+    torch.save(netG.state_dict(), '%s/netG_epoch_%d.pth' % (run_dir, epoch))
+    torch.save(netD.state_dict(), '%s/netD_epoch_%d.pth' % (run_dir, epoch))
