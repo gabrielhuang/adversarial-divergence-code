@@ -35,7 +35,7 @@ parser.add_argument('--cuda', type=int, default=1, help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
 parser.add_argument('--netG', default='', help="path to netG (to continue training)")
 parser.add_argument('--netD', default='', help="path to netD (to continue training)")
-parser.add_argument('--gp', default=1., type=float, help="gradient penalty")
+parser.add_argument('--gp', default=10., type=float, help="gradient penalty")
 parser.add_argument('--outf', default='gan_output', help='folder to output images and model checkpoints')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 
