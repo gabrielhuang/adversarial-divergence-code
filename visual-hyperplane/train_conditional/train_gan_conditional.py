@@ -11,6 +11,7 @@ import torch.utils.data
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
+import json
 
 import sys
 sys.path.append('../common')
@@ -57,6 +58,9 @@ if opt.manualSeed is None:
 print("Random Seed: ", opt.manualSeed)
 random.seed(opt.manualSeed)
 torch.manual_seed(opt.manualSeed)
+
+with open('{}/args.json'.format(run_dir),'wb') as fp:
+              json.dump(vars(opt), fp, indent=4)
 
 cudnn.benchmark = True
 
