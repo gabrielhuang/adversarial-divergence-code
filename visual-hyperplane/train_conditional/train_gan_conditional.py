@@ -14,7 +14,7 @@ import torchvision.utils as vutils
 
 import sys
 sys.path.append('../common')
-from gan_models import Generator, Discriminator, MnistGenerator, MnistDiscriminator
+from gan_models import Generator, Discriminator, MnistGeneratorBN, MnistDiscriminator
 from gradient_penalty import compute_gradient_penalty
 
 
@@ -117,7 +117,7 @@ nc = 3
 
 # Create networks
 if opt.dataset == 'mnist':
-    netG = MnistGenerator().to(device)
+    netG = MnistGeneratorBN().to(device)
     netD = MnistDiscriminator().to(device)
 else:
     netG = Generator(nz, ngf, nc).to(device)
