@@ -162,11 +162,16 @@ class MnistDiscriminator(nn.Module):
             # latent:1x1
             ReshapeLayer([-1, latent_dim]),
             nn.Linear(latent_dim, 1),
-            nn.Sigmoid()
             # 1
         )
 
+        self.sigmoid = nn.Sigmoid()
+
     def forward(self, input):
+        output = self.sigmoid(self.main(input))
+        return output
+
+    def get_logits(self, input):
         output = self.main(input)
         return output
 
