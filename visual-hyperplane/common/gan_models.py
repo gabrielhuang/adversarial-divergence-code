@@ -108,6 +108,37 @@ class MnistGenerator(nn.Module):
         return output
 
 
+class MnistGeneratorBN(nn.Module):
+    def __init__(self, latent_dim=100, filters=64):
+        super(MnistGeneratorBN, self).__init__()
+
+        self.latent_dim = latent_dim
+        self.filters = filters
+
+        self.main = nn.Sequential(
+            # latent:1x1
+            nn.ConvTranspose2d(latent_dim, 4*filters, 4, 1, 0),
+            nn.BatchNorm2d(4*filters),
+            nn.ReLU(True),
+            # 256:4x4
+            nn.ConvTranspose2d(4*filters, 2*filters, 4, 2, 1),
+            nn.BatchNorm2d(2*filters),
+            nn.ReLU(True),
+            # 128:8x8
+            nn.ConvTranspose2d(2*filters, filters, 4, 2, 2),
+            nn.BatchNorm2d(filters),
+            nn.ReLU(True),
+            # 64:14x14
+            nn.ConvTranspose2d(filters, 1, 4, 2, 1),
+            nn.Tanh()
+            # 1:28x28
+        )
+
+    def forward(self, input):
+        output = self.main(input)
+        return output
+
+
 class MnistDiscriminator(nn.Module):
     def __init__(self, latent_dim=100, filters=64):
         super(MnistDiscriminator, self).__init__()
