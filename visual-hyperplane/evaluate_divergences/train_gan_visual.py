@@ -42,6 +42,8 @@ print(opt)
 
 if opt.digit != -1:
     run_dir = '{}/digit_{}'.format(opt.outf, opt.digit)
+else:
+    run_dir = opt.outf
 
 try:
     os.makedirs(run_dir)
@@ -115,8 +117,8 @@ if opt.dataset == 'mnist':
     netG = MnistGenerator().to(device)
     netD = MnistDiscriminator().to(device)
 else:
-    netG = Generator(ngpu, nz, ngf, nc).to(device)
-    netD = Discriminator(ngpu, nc).to(device)
+    netG = Generator(nz, ngf, nc).to(device)
+    netD = Discriminator(ngf, nc).to(device)
 
 
 # custom weights initialization called on netG and netD
