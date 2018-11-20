@@ -15,7 +15,7 @@ import torchvision.utils as vutils
 import sys
 sys.path.append('../common')
 from gan_models import Generator, Discriminator, MnistGeneratorBN, MnistDiscriminator
-from gradient_penalty import compute_gradient_penalty
+from gradient_penalty import compute_gradient_penalty_logits
 
 
 parser = argparse.ArgumentParser()
@@ -184,8 +184,8 @@ for epoch in range(opt.niter):
         # gradient penalty
         gp = 0.
         if opt.gp > 0.:
-            gp_real = opt.gp * compute_gradient_penalty(netD, real_cpu)
-            gp_fake = opt.gp * compute_gradient_penalty(netD, fake.detach())
+            gp_real = opt.gp * compute_gradient_penalty_logits(netD, real_cpu)
+            gp_fake = opt.gp * compute_gradient_penalty_logits(netD, fake.detach())
             gradient_penalty = gp_real + gp_fake
             gradient_penalty.backward()
             gp = gradient_penalty.item()
