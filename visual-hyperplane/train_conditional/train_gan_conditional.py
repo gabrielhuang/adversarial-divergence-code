@@ -184,7 +184,9 @@ for epoch in range(opt.niter):
         # gradient penalty
         gp = 0.
         if opt.gp > 0.:
-            gradient_penalty = opt.gp * compute_gradient_penalty(netD, real_cpu)
+            gp_real = opt.gp * compute_gradient_penalty(netD, real_cpu)
+            gp_fake = opt.gp * compute_gradient_penalty(netD, fake.detach())
+            gradient_penalty = gp_real + gp_fake
             gradient_penalty.backward()
             gp = gradient_penalty.item()
 
