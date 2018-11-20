@@ -3,12 +3,12 @@ import torch
 
 def compute_gradient_penalty(netD, data):
     # Dunnow how to do this better with detach
-    data = torch.autograd.Variable(data.detach(), requires_grad=True)
+    data = torch.autograd.Variable(data.detach(), requires_grad=True).to(data.device)
     outputs = netD(data)
 
     gradients = torch.autograd.grad(outputs=outputs,
                                     inputs=data,
-                                    grad_outputs=torch.ones(outputs.size()),
+                                    grad_outputs=torch.ones(outputs.size()).to(data.device),
                                     create_graph=True,
                                     retain_graph=True,
                                     only_inputs=True)[0]
@@ -22,12 +22,12 @@ def compute_gradient_penalty(netD, data):
 
 def compute_gradient_penalty_logits(netD, data):
     # Dunnow how to do this better with detach
-    data = torch.autograd.Variable(data.detach(), requires_grad=True)
+    data = torch.autograd.Variable(data.detach(), requires_grad=True).to(data.device)
     outputs = netD.get_logits(data)
 
     gradients = torch.autograd.grad(outputs=outputs,
                                     inputs=data,
-                                    grad_outputs=torch.ones(outputs.size()),
+                                    grad_outputs=torch.ones(outputs.size()).to(data.device),
                                     create_graph=True,
                                     retain_graph=True,
                                     only_inputs=True)[0]
