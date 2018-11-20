@@ -40,7 +40,8 @@ parser.add_argument('--manualSeed', type=int, help='manual seed')
 opt = parser.parse_args()
 print(opt)
 
-run_dir = '{}/digit_{}'.format(opt.outf, opt.digit)
+if opt.digit != -1:
+    run_dir = '{}/digit_{}'.format(opt.outf, opt.digit)
 
 try:
     os.makedirs(run_dir)
