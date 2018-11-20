@@ -99,7 +99,7 @@ class MnistGenerator(nn.Module):
             nn.ReLU(True),
             # 64:14x14
             nn.ConvTranspose2d(filters, 1, 4, 2, 1),
-            nn.Sigmoid()
+            nn.Tanh()
             # 1:28x28
         )
 

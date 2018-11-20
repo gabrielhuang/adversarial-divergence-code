@@ -88,8 +88,9 @@ elif opt.dataset == 'cifar10':
 elif opt.dataset == 'mnist':
     # Select only relevant digit
     transform = transforms.Compose([
-       transforms.ToTensor()])
-
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
     train_digits = []
     for data, label in dset.MNIST('data', train=True, download=True, transform=transform):
         if opt.digit == -1 or label.item() == opt.digit:
