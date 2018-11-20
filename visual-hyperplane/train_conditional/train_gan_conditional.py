@@ -15,6 +15,7 @@ import torchvision.utils as vutils
 import sys
 sys.path.append('../common')
 from gan_models import Generator, Discriminator, MnistGenerator, MnistDiscriminator
+from gradient_penalty import compute_gradient_penalty
 
 
 parser = argparse.ArgumentParser()
@@ -34,6 +35,7 @@ parser.add_argument('--cuda', type=int, default=1, help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
 parser.add_argument('--netG', default='', help="path to netG (to continue training)")
 parser.add_argument('--netD', default='', help="path to netD (to continue training)")
+parser.add_argument('--gp', default=1., type=float, help="gradient penalty")
 parser.add_argument('--outf', default='gan_output', help='folder to output images and model checkpoints')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 
@@ -178,6 +180,14 @@ for epoch in range(opt.niter):
         errD_fake = criterion(output, label)
         errD_fake.backward()
         D_G_z1 = output.mean().item()
+
+        # gradient penalty
+        gp = 0.
+        if opt.gp > 0.:
+            gradient_penalty = opt.gp * compute_gradient_penalty(netD, real_cpu)
+            gradient_penalty.backward()
+            gp = gradient_penalty.item()
+
         errD = errD_real + errD_fake
         optimizerD.step()
 
@@ -195,6 +205,7 @@ for epoch in range(opt.niter):
         print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
               % (epoch, opt.niter, i, len(dataloader),
                  errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
+        print('Gradient Penalty: %.4f' % gp)
         if i % 100 == 0:
             vutils.save_image(real_cpu,
                     '%s/real_samples.png' % run_dir,
