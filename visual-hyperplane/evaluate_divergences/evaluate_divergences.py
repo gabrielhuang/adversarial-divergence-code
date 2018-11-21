@@ -73,7 +73,7 @@ p.DIGIT_BATCH_SIZE = 64
 
 ###### GAN training
 # Total training iterations
-p.ITERATIONS = 10000
+p.ITERATIONS = 40000
 
 # Gradient penalty
 p.PENALTY = 0.  # 10.
@@ -207,12 +207,12 @@ eval_pairs['NewCombination'] = {
 }
 
 # Eval (different visual, same combination)
-eval_pairs['Vae'] = {
-    'p_visual': test_visual_samplers,
-    'q_visual': vae_visual_samplers,
-    'p_symbol': sum_25.train_positive,
-    'q_symbol': sum_25.train_negative,
-}
+#eval_pairs['Vae'] = {
+#    'p_visual': test_visual_samplers,
+#    'q_visual': vae_visual_samplers,
+#    'p_symbol': sum_25.train_positive,
+#    'q_symbol': sum_25.train_negative,
+#}
 
 # Eval (different visual, different combination)
 eval_pairs['VaeNewCombination'] = {
@@ -222,21 +222,31 @@ eval_pairs['VaeNewCombination'] = {
     'q_symbol': sum_25.test_negative,
 }
 
-# Eval (different visual, same combination)
-eval_pairs['NewFlippedVaeNewCombination'] = {
-    'p_visual': vae_visual_samplers,
-    'q_visual': test_visual_samplers,
-    'p_symbol': sum_25.train_positive,
-    'q_symbol': sum_25.train_negative,
-}
-
-
 # Eval (different visual, different combination)
 eval_pairs['GanNewCombination'] = {
     'p_visual': test_visual_samplers,
     'q_visual': gan_visual_samplers,
     'p_symbol': sum_25.test_positive,
     'q_symbol': sum_25.test_negative,
+}
+
+# Eval (different visual, same combination)
+eval_pairs['FlippedVaeNewCombination'] = {
+    'p_visual': vae_visual_samplers,
+    'q_visual': test_visual_samplers,
+    'p_symbol': sum_25.test_positive,
+    'q_symbol': sum_25.test_negative,
+}
+
+# Eval (different visual, same combination)
+eval_pairs['FlippedGanNewCombination'] = {
+    'p_visual': gan_visual_samplers,
+    'q_visual': test_visual_samplers,
+    'p_symbol': sum_25.test_positive,
+    'q_symbol': sum_25.test_negative,
+}
+
+
 }
 
 ##########################################
