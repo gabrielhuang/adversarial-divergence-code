@@ -29,8 +29,8 @@ class VAE(nn.Module):
         h3 = F.relu(self.fc3(z))
         return F.sigmoid(self.fc4(h3))
 
-    def generate(self, batch_size):
-        z = torch.randn(batch_size, 20)
+    def generate(self, batch_size, device='cpu'):
+        z = torch.randn(batch_size, 20).to(device)
         x = self.decode(z)
         return x.view(len(x), 1, 28, 28)
 
