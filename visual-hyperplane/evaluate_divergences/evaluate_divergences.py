@@ -10,12 +10,29 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.ndimage.filters import gaussian_filter1d
+import argparse
 
 from common.models import VAE, Discriminator2, Discriminator4, DiscriminatorCNN
 from common.gan_models import MnistGeneratorBN
 from common.problems import get_problem
 from common import digits_sampler
 
+###############################
+parser = argparse.ArgumentParser()
+parser.add_argument('--iterations', default=100000, type=int, dest='ITERATIONS', help='iterations to train discriminator')
+parser.add_argument('--architecture', default='DiscriminatorCNN',
+                    choices=['DiscriminatorCNN','Discriminator2','Discriminator4'],
+                    dest='ARCHITECTURE', help='architecture')
+parser.add_argument('--train', default=0.5, type=float, dest='TRAIN_RATIO', help='percentage train')
+parser.add_argument('--digit-batch', default=64, type=int, dest='DIGIT_BATCH_SIZE', help='batch size for generating individual digits')
+parser.add_argument('--combination-batch', default=12, type=int, dest='COMBINATION_BATCH_SIZE', help='batch size for combinations')
+parser.add_argument('--debug', default=0, type=int, dest='DEBUG_TEST', help='for debugging only')
+parser.add_argument('--penalty', default=0., type=float, dest='PENALTY', help='gradient penalty')
+parser.add_argument('--lr', default=0.001, type=float, dest='LR', help='gradient penalty')
+parser.add_argument('--cuda', default=1, type=int, dest='CUDA', help='use cuda')
+
+p = parser.parse_args()
+device = 'cuda:0' if p.CUDA else 'cpu'
 ###############################
 
 # All parameters go here
@@ -57,39 +74,6 @@ class Summary(object):
             val = dict(tail).values()
             print '\t{}: {:.4f} +/- {:.4f}'.format(log, np.mean(val), np.std(val))
 
-p = Parameters()
-
-# Train/Test Ratio
-p.TRAIN_RATIO = 0.5
-
-p.DEBUG_TEST = False
-#p.DEBUG_TEST = True
-#print 'Warning DEBUG'
-
-# Batch-size for individual digits
-p.DIGIT_BATCH_SIZE = 64
-
-#p.ONLY_CLASSIFY = False  # no training other than classify (for debbuging)
-
-###### GAN training
-# Total training iterations
-p.ITERATIONS = 40000
-
-# Gradient penalty
-p.PENALTY = 0.  # 10.
-p.LR = 1e-3  # Adam learning rate
-
-# Batch-size for visual combinations
-p.COMBINATION_BATCH_SIZE = 12
-
-###### Architecture
-#p.ARCHITECTURE = 'Discriminator2'
-p.ARCHITECTURE = 'DiscriminatorCNN'
-#p.ARCHITECTURE = 'Discriminator4'
-
-p.CUDA = True
-
-device = 'cuda:0' if p.CUDA else 'cpu'
 
 
 #############################
@@ -247,7 +231,6 @@ eval_pairs['FlippedGanNewCombination'] = {
 }
 
 
-}
 
 ##########################################
 # Create discriminator
