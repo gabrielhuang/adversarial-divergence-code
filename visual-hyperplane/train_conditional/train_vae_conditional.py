@@ -22,13 +22,13 @@ parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
-parser.add_argument('--logdir', default='log')
+parser.add_argument('--logdir', default='vae_output')
 parser.add_argument('--digit', default=-1, type=int)
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 print(args)
 
-run_dir = '{}/digit-{}'.format(args.logdir, args.digit if args.digit!=-1 else 'all')
+run_dir = '{}/digit_{}'.format(args.logdir, args.digit if args.digit!=-1 else 'all')
 if not os.path.exists(run_dir):
     os.makedirs(run_dir)
 
