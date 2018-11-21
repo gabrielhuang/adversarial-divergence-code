@@ -40,5 +40,6 @@ Evaluate on:
 
 ```
 cd evaluate_divergences/
-python evaluate_divergences.py
+python evaluate_divergences.py  # train discriminator
+python divergence_gui.py  # plot results
 ```
