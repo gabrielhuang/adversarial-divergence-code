@@ -87,7 +87,7 @@ p.COMBINATION_BATCH_SIZE = 12
 p.ARCHITECTURE = 'DiscriminatorCNN'
 #p.ARCHITECTURE = 'Discriminator4'
 
-p.CUDA = False
+p.CUDA = True
 
 device = 'cuda:0' if p.CUDA else 'cpu'
 
@@ -119,7 +119,7 @@ def compute_gradient_penalty(netD, data):
 
     gradients = torch.autograd.grad(outputs=outputs,
                                     inputs=data,
-                                    grad_outputs=torch.ones(outputs.size()),
+                                    grad_outputs=torch.ones(outputs.size()).to(device),
                                     create_graph=True,
                                     retain_graph=True,
                                     only_inputs=True)[0]
@@ -150,7 +150,7 @@ def export_pdf(fname, stats, smooth_window=21, fontsize=12):
     plt.savefig(fname)
 
 ##################
-# Load all GANs
+# Load all True
 print 'Loading GANs'
 gan_visual_samplers = []
 for i in xrange(10):
@@ -242,7 +242,7 @@ eval_pairs['GanNewCombination'] = {
 ##########################################
 # Create discriminator
 DiscriminatorClass = eval(p.ARCHITECTURE)
-discriminator = DiscriminatorClass()
+discriminator = DiscriminatorClass().to(device)
 print discriminator
 optimizer = torch.optim.Adam(discriminator.parameters(), lr=p.LR)
 
@@ -268,8 +268,8 @@ try:
         p_out = discriminator(p_digit_images)
         q_out = discriminator(q_digit_images)
 
-        p_target = torch.ones(len(p_out)) # REAL is ONE, FAKE is ZERO
-        q_target = torch.zeros(len(q_out)) # REAL is ONE, FAKE is ZERO
+        p_target = torch.ones(len(p_out)).to(device) # REAL is ONE, FAKE is ZERO
+        q_target = torch.zeros(len(q_out)).to(device) # REAL is ONE, FAKE is ZERO
 
         # Compute loss
         p_loss = criterion(p_out, p_target)
@@ -297,8 +297,8 @@ try:
         for name, eval_pair in eval_pairs.items():
 
             # Evaluate when it can distinguish with imperfect samples
-            p_digit_images = digits_sampler.sample_visual_combination(eval_pair['p_symbol'], eval_pair['p_visual'], p.COMBINATION_BATCH_SIZE)
-            q_digit_images = digits_sampler.sample_visual_combination(eval_pair['q_symbol'], eval_pair['q_visual'], p.COMBINATION_BATCH_SIZE)
+            p_digit_images = digits_sampler.sample_visual_combination(eval_pair['p_symbol'], eval_pair['p_visual'], p.COMBINATION_BATCH_SIZE).to(device)
+            q_digit_images = digits_sampler.sample_visual_combination(eval_pair['q_symbol'], eval_pair['q_visual'], p.COMBINATION_BATCH_SIZE).to(device)
 
             # Compute output
             p_out = discriminator(p_digit_images)
@@ -311,7 +311,7 @@ try:
             classifier_accuracy = 0.5 * ((p_out>0.5).float().mean() + (q_out<=0.5).float().mean())
 
             # Compute calibrated accuracy
-            thresholds = torch.linspace(0, 1, 1000)
+            thresholds = torch.linspace(0, 1, 1000).to(device)
             calibrated_accuracy = 0.5 * torch.max((p_out > thresholds).float().mean(0)
                                                        + (q_out <= thresholds).float().mean(0))
 
