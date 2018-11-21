@@ -31,7 +31,7 @@ or
 
 Then run the jupyter notebook `evaluate_joint_likelihood.ipynb`
 
-#### Main result
+#### Main result: Likelihood fixates on visual appearance.
 
 Likelihood(Test-25||VaeEpoch80-Non25) - Likelihood(Test-25||VaeEpoch70-Non25) >> 
 Likelihood(Test-25||VaeEpoch70-25) - Likelihood(Test-25||VaeEpoch70-Non25)
