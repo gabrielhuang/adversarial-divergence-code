@@ -67,20 +67,38 @@ class DatasetVisualSampler(object):
 
 
 class VaeVisualSampler(object):
-    def __init__(self, vae, batch_size=64):
+    def __init__(self, vae, batch_size=64, device='cpu'):
         self.idx = batch_size
         self.batch_size = batch_size
         self.vae = vae
+        self.device = device
 
     def __call__(self):  # return one sample
         if self.idx >= self.batch_size:
             # Regenerate new
-            self.cache = self.vae.generate(self.batch_size)
+            self.cache = self.vae.generate(self.batch_size, self.device)
             self.idx = 0
         sample = self.cache[self.idx][None, ...]  # preserve dims
         self.idx += 1
         return sample.detach()
 
+
+class GanVisualSampler(object):
+
+    def __init__(self, gan, batch_size=64, device='cpu'):
+        self.idx = batch_size
+        self.batch_size = batch_size
+        self.gan = gan
+        self.device = device
+
+    def __call__(self):  # return one sample
+        if self.idx >= self.batch_size:
+            # Regenerate new
+            self.cache = 0.5 + 0.5*self.gan.generate(self.batch_size, self.device)
+            self.idx = 0
+        sample = self.cache[self.idx][None, ...]  # preserve dims
+        self.idx += 1
+        return sample.detach()
 
 def sample_visual_combination(symbolic, visual, combination_batch_size):
     samples = []

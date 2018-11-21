@@ -87,6 +87,10 @@ p.COMBINATION_BATCH_SIZE = 12
 p.ARCHITECTURE = 'DiscriminatorCNN'
 #p.ARCHITECTURE = 'Discriminator4'
 
+p.CUDA = False
+
+device = 'cuda:0' if p.CUDA else 'cpu'
+
 
 #############################
 # Create output directory
@@ -154,7 +158,8 @@ for i in xrange(10):
     state_dict = torch.load('../train_conditional/gan_conditional/netG_epoch_49 ({}).pth'.format(i),
                             map_location=lambda storage, loc: storage)
     gan.load_state_dict(state_dict)
-    gan_visual_samplers.append(digits_sampler.GanVisualSampler(gan))
+    gan.to(device)
+    gan_visual_samplers.append(digits_sampler.GanVisualSampler(gan, device=device))
 ##################
 # Load all VAES
 print 'Loading VAEs'
@@ -165,7 +170,8 @@ for i in xrange(10):
     vae = VAE()
     state_dict = torch.load('../train_conditional/vae_conditional/epoch_{}/digit_{}_epoch_{}.pth'.format(EPOCH, i, EPOCH))
     vae.load_state_dict(state_dict)
-    vae_visual_samplers.append(digits_sampler.VaeVisualSampler(vae))
+    vae.to(device)
+    vae_visual_samplers.append(digits_sampler.VaeVisualSampler(vae, device=device))
 #####################################################
 print 'Loading MNIST digits'
 
@@ -252,8 +258,8 @@ try:
     for iteration in xrange(p.ITERATIONS):
         ####################################
         # Sample visual combination
-        p_digit_images = digits_sampler.sample_visual_combination(train_p_symbolic, train_p_visual, p.COMBINATION_BATCH_SIZE)
-        q_digit_images = digits_sampler.sample_visual_combination(train_q_symbolic, train_q_visual, p.COMBINATION_BATCH_SIZE)
+        p_digit_images = digits_sampler.sample_visual_combination(train_p_symbolic, train_p_visual, p.COMBINATION_BATCH_SIZE).to(device)
+        q_digit_images = digits_sampler.sample_visual_combination(train_q_symbolic, train_q_visual, p.COMBINATION_BATCH_SIZE).to(device)
 
         ####################################
         #  Train discriminator

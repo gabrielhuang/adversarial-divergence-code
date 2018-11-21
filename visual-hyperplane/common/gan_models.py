@@ -139,8 +139,8 @@ class MnistGeneratorBN(nn.Module):
         output = self.main(input)
         return output
 
-    def generate(self, batch_size):
-        noise = torch.randn(batch_size, self.latent_dim, 1, 1)
+    def generate(self, batch_size, device='cpu'):
+        noise = torch.randn(batch_size, self.latent_dim, 1, 1).to(device)
         fake = self(noise)
         return fake
 
