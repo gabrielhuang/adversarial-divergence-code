@@ -13,7 +13,7 @@ from scipy.ndimage.filters import gaussian_filter1d
 
 from common.models import VAE, Discriminator2, Discriminator4
 from common.problems import get_problem
-from common import digits
+from common import digits_sampler
 
 ###############################
 
@@ -151,9 +151,12 @@ vaes = {}
 EPOCH = 70
 for i in xrange(10):
     vae = VAE()
-    state_dict = torch.load('epoch_{}/digit_{}_epoch_{}.pth'.format(EPOCH, i, EPOCH))
+    state_dict = torch.load('../train_conditional/vae_conditional/epoch_{}/digit_{}_epoch_{}.pth'.format(EPOCH, i, EPOCH))
     vae.load_state_dict(state_dict)
     vaes[i] = vae
+
+# Prepare VAE visual sampler
+vae_visual_samplers = [digits_sampler.VaeVisualSampler(vaes[i]) for i in xrange(10)]
 #####################################################
 print 'Loading MNIST digits'
 
@@ -161,24 +164,24 @@ print 'Loading MNIST digits'
 digit_test_iter = {}
 for i in xrange(10):
     print 'Loading digit', i
-    test_digit = digits.load_one_mnist_digit(i, train=False, debug=p.DEBUG_TEST)
+    test_digit = digits_sampler.load_one_mnist_digit(i, train=False, debug=p.DEBUG_TEST)
     digit_test_iter[i] = make_infinite(
         torch.utils.data.DataLoader(test_digit, batch_size=1, shuffle=True))
+
+# Prepare mnist visuak sampler
+test_visual_samplers = [digits_sampler.DatasetVisualSampler(digit_test_iter[i]) for i in xrange(10)]
 #####################################################
 
-vae_visual_samplers = [digits.VaeVisualSampler(vaes[i]) for i in xrange(10)]
-test_visual_samplers = [digits.DatasetVisualSampler(digit_test_iter[i]) for i in xrange(10)]
 
 
 # Load the two problems
 sum_25 = get_problem('sum_25', 'int', train_ratio=p.TRAIN_RATIO)
-non_25 = get_problem('non_25', 'int', train_ratio=p.TRAIN_RATIO)
 
 # Training Visual Distributions
 train_p_visual = test_visual_samplers
 train_q_visual = test_visual_samplers
 train_p_symbolic = sum_25.train_positive
-train_q_symbolic = non_25.train_positive
+train_q_symbolic = sum_25.train_negative
 
 eval_pairs = {}
 
@@ -187,7 +190,7 @@ eval_pairs['NewCombination'] = {
     'p_visual': test_visual_samplers,
     'q_visual': test_visual_samplers,
     'p_symbol': sum_25.test_positive,
-    'q_symbol': non_25.test_positive,
+    'q_symbol': sum_25.test_negative,
 }
 
 # Eval (different visual, same combination)
@@ -195,7 +198,7 @@ eval_pairs['NewVisual'] = {
     'p_visual': test_visual_samplers,
     'q_visual': vae_visual_samplers,
     'p_symbol': sum_25.train_positive,
-    'q_symbol': non_25.train_positive,
+    'q_symbol': sum_25.train_negative,
 }
 
 # Eval (different visual, different combination)
@@ -203,7 +206,15 @@ eval_pairs['NewVisualNewCombination'] = {
     'p_visual': test_visual_samplers,
     'q_visual': vae_visual_samplers,
     'p_symbol': sum_25.test_positive,
-    'q_symbol': non_25.test_positive,
+    'q_symbol': sum_25.test_negative,
+}
+
+# Eval (different visual, same combination)
+eval_pairs['NewFlippedVisualNewCombination'] = {
+    'p_visual': vae_visual_samplers,
+    'q_visual': test_visual_samplers,
+    'p_symbol': sum_25.train_positive,
+    'q_symbol': sum_25.train_negative,
 }
 
 
@@ -226,8 +237,8 @@ try:
     for iteration in xrange(p.ITERATIONS):
         ####################################
         # Sample visual combination
-        p_digit_images = digits.sample_visual_combination(train_p_symbolic, train_p_visual, p.COMBINATION_BATCH_SIZE)
-        q_digit_images = digits.sample_visual_combination(train_q_symbolic, train_q_visual, p.COMBINATION_BATCH_SIZE)
+        p_digit_images = digits_sampler.sample_visual_combination(train_p_symbolic, train_p_visual, p.COMBINATION_BATCH_SIZE)
+        q_digit_images = digits_sampler.sample_visual_combination(train_q_symbolic, train_q_visual, p.COMBINATION_BATCH_SIZE)
 
         ####################################
         #  Train discriminator
@@ -265,8 +276,8 @@ try:
         for name, eval_pair in eval_pairs.items():
 
             # Evaluate when it can distinguish with imperfect samples
-            p_digit_images = digits.sample_visual_combination(eval_pair['p_symbol'], eval_pair['p_visual'], p.COMBINATION_BATCH_SIZE)
-            q_digit_images = digits.sample_visual_combination(eval_pair['q_symbol'], eval_pair['q_visual'], p.COMBINATION_BATCH_SIZE)
+            p_digit_images = digits_sampler.sample_visual_combination(eval_pair['p_symbol'], eval_pair['p_visual'], p.COMBINATION_BATCH_SIZE)
+            q_digit_images = digits_sampler.sample_visual_combination(eval_pair['q_symbol'], eval_pair['q_visual'], p.COMBINATION_BATCH_SIZE)
 
             # Compute output
             p_out = discriminator(p_digit_images)
