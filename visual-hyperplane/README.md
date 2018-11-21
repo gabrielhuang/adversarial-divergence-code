@@ -1,7 +1,7 @@
 # Visual Hyperplane Experiments
 
-This experiment compares KL-divergence (nonparametric) 
-and a GAN-divergence for enforcing toy constraints 
+This experiment compares a Nonparametric divergence (KL/Maximum Likelihood)
+and a Parametric divergence (Regularized GAN) for enforcing toy constraints 
 (MNIST digits have to sum up to 25).
 
 There are two steps:
