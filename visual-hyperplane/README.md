@@ -44,7 +44,7 @@ It is *much harder* to do same experiment for GAN: divergence values are not sta
 Besides, if the distributions are visually very different (e.g. Test-25/Vae-25), the discrimininator will converge to 100% accuracy. Of course we could prevent it of having 100% accuracy by regularizing, but the point is that the value is hard to interpret in general.
 
 
-### 3. Evaluate if Parametric divergence (Regularized GAN) can enforce Sum-25.
+### 3. Can Discriminator detect Sum-25 constraint with imperfect samples?
 
 ```cd evaluate_divergences/```
 
@@ -70,7 +70,7 @@ the discriminator tends to fixate on visual properties (because they allow 100% 
 This might explain why samples from GANs seem to lack global consistency as scenes. Since images are already imperfect, the discriminator can tell them apart without need to enforce any physical constraints.
 
 
-### 4. Evaluate if Parametric divergence (Regularized GAN) can enforce Sum-25.
+### 4. Using a side-task to make discriminator enforce Sum-25 constraint.
 
 #### Motivation: generate digits that sum up to 25.
 
