@@ -61,15 +61,10 @@ p = Parameters()
 # Train/Test Ratio
 p.TRAIN_RATIO = 0.5
 
-#p.DEBUG_TEST = False
-p.DEBUG_TEST = True
+p.DEBUG_TEST = False
+#p.DEBUG_TEST = True
 #print 'Warning DEBUG'
 
-###### Surrogate task: Classify individual digits
-# if negative, do not learn to classify.
-#p.LEARN_TO_CLASSIFY = 0.0
-#p.LEARN_TO_CLASSIFY = 0.1
-#p.LEARN_TO_CLASSIFY = 0.
 # Batch-size for individual digits
 p.DIGIT_BATCH_SIZE = 64
 
@@ -171,11 +166,7 @@ for i in xrange(10):
         torch.utils.data.DataLoader(test_digit, batch_size=1, shuffle=True))
 #####################################################
 
-# Load all MNIST digits
-train_iter, test_iter = digits.load_full_mnist_digits(batch_size=p.DIGIT_BATCH_SIZE)
-
-#####################################################
-vae_visual_samplers = [digits.ModelVisualSampler(vaes[i]) for i in xrange(10)]
+vae_visual_samplers = [digits.VaeVisualSampler(vaes[i]) for i in xrange(10)]
 test_visual_samplers = [digits.DatasetVisualSampler(digit_test_iter[i]) for i in xrange(10)]
 
 
@@ -235,8 +226,8 @@ try:
     for iteration in xrange(p.ITERATIONS):
         ####################################
         # Sample visual combination
-        p_digit_images = sample_visual_combination(train_p_symbolic, train_p_visual, p.COMBINATION_BATCH_SIZE)
-        q_digit_images = sample_visual_combination(train_q_symbolic, train_q_visual, p.COMBINATION_BATCH_SIZE)
+        p_digit_images = digits.sample_visual_combination(train_p_symbolic, train_p_visual, p.COMBINATION_BATCH_SIZE)
+        q_digit_images = digits.sample_visual_combination(train_q_symbolic, train_q_visual, p.COMBINATION_BATCH_SIZE)
 
         ####################################
         #  Train discriminator
@@ -261,22 +252,6 @@ try:
 
         total_loss = classifier_loss + penalty_loss
 
-
-
-        # Learn to classify?
-        #if p.LEARN_TO_CLASSIFY >= 0.:
-        #    data, target = train_iter.next()
-        #    output = discriminator.classify_digit(data)
-        #    digit_loss = nll_loss(output, target)
-        #    s.digit_losses.append(digit_loss.item())
-        #    digit_accuracy = (output.argmax(1) == target).float().mean()
-        #    s.digit_accuracies.append(digit_accuracy.item())
-
-        #    if p.ONLY_CLASSIFY:
-        #        total_loss = digit_loss
-        #    else:
-        #        total_loss = total_loss + p.LEARN_TO_CLASSIFY * digit_loss
-
         optimizer.zero_grad()
         total_loss.backward()
         optimizer.step()
@@ -286,16 +261,12 @@ try:
         summary.log(iteration, 'Train/Accuracy', classifier_accuracy.item())
 
         ######################################
-        # Evaluate if it can distinguish constraint when using perfect visual samples
-        # difference with training is model_visual_samplers are replaced with target_visual_samplers
-        #eval_target_visual = sample_visual_combination(target_symbolic_samplers, target_visual_samplers, p.COMBINATION_BATCH_SIZE)
-        #eval_model_visual = sample_visual_combination(model_symbolic_samplers, target_visual_samplers, p.COMBINATION_BATCH_SIZE)
 
         for name, eval_pair in eval_pairs.items():
 
             # Evaluate when it can distinguish with imperfect samples
-            p_digit_images = sample_visual_combination(eval_pair['p_symbol'], eval_pair['p_visual'], p.COMBINATION_BATCH_SIZE)
-            q_digit_images = sample_visual_combination(eval_pair['q_symbol'], eval_pair['q_visual'], p.COMBINATION_BATCH_SIZE)
+            p_digit_images = digits.sample_visual_combination(eval_pair['p_symbol'], eval_pair['p_visual'], p.COMBINATION_BATCH_SIZE)
+            q_digit_images = digits.sample_visual_combination(eval_pair['q_symbol'], eval_pair['q_visual'], p.COMBINATION_BATCH_SIZE)
 
             # Compute output
             p_out = discriminator(p_digit_images)
@@ -316,16 +287,6 @@ try:
             summary.log(iteration, 'Eval/{}/Loss'.format(name), classifier_loss.item())
             summary.log(iteration, 'Eval/{}/Accuracy'.format(name), classifier_accuracy.item())
             #summary.log(iteration, 'Eval/{}/CalibratedAccuracy'.format(name), calibrated_accuracy.item())
-        ######################################
-        # Evaluate classification accuracy on model distribution
-        #target = torch.LongTensor(list(range(10))*6)
-        #individual_visual = combination_to_visual(target, model_visual_samplers)
-        #individual_visual = individual_visual.view(-1, 1, 28, 28)
-        #output = discriminator.classify_digit(individual_visual)
-        #digit_loss = nll_loss(output, target)
-        #s.model_digit_losses.append(digit_loss.item())
-        #digit_accuracy = (output.argmax(1) == target).float().mean()
-        #s.model_digit_accuracies.append(digit_accuracy.item())
 
         ######################################
         # Log
