@@ -31,14 +31,15 @@ or
 
 Then run the jupyter notebook `evaluate_joint_likelihood.ipynb`
 
-*Main result*:
+#### Main result
 
 Likelihood(Test-25||VaeEpoch80-Non25) - Likelihood(Test-25||VaeEpoch70-Non25) >> 
 Likelihood(Test-25||VaeEpoch70-25) - Likelihood(Test-25||VaeEpoch70-Non25)
 
-In other words, Likelihood focuses mostly on visual appearance, and there is almost no gain for enforcing Sum-25 constraint.
+In other words, Likelihood focuses almost exclusively on visual appearance. There is almost no gain for enforcing Sum-25 constraint. In constrast, slightly improving the visual model (epoch 70->80) improves the likelihood significantly.
 
--> same experiment for GAN?
+#### Same experiment on GAN?
+It is *much harder* to do same experiment for GAN: divergence values are not stable and depend on network initialization and sampling of the data during SGD. Some formulations (WGAN/WGAN-GP) are more stable than others (Unregularized GAN), but in general the values are hard to compare.
 
 
 ### 3. Evaluate if Parametric divergence (Regularized GAN) can enforce Sum-25.
