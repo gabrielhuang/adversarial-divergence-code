@@ -104,6 +104,58 @@ class Discriminator2(nn.Module):
         return x
 
 
+class ReshapeLayer(nn.Module):
+    def __init__(self, shape):
+        super(ReshapeLayer, self).__init__()
+        self.shape = shape
+
+    def forward(self, x):
+        return x.view(self.shape)
+
+
+class DiscriminatorCNN(nn.Module):
+    def __init__(self):
+        nn.Module.__init__(self)
+
+        latent_dim = 100
+        filters = 64
+        self.embedder = nn.Sequential(
+            # 1:28x28
+            nn.Conv2d(1, filters, 4, 2, 1),
+            nn.ReLU(True),
+            # 64:14x14
+            nn.Conv2d(filters, 2*filters, 4, 2, 2),
+            nn.ReLU(True),
+            # 128:8x8
+            nn.Conv2d(2*filters, 4*filters, 4, 2, 1),
+            nn.ReLU(True),
+            # 256:4x4
+            nn.Conv2d(4*filters, latent_dim, 4, 1, 0),
+            nn.ReLU(True),
+            # latent:1x1
+            ReshapeLayer([-1, latent_dim]),
+            # 1
+        )
+
+        self.merge = nn.Sequential(
+            nn.Linear(latent_dim*5, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        x_per_digit = x.view(len(x)*5, 1, 28, 28)
+        embeddings = self.embedder(x_per_digit)
+        embeddings_merged = embeddings.view(len(x), -1)
+        out = self.merge(embeddings_merged)
+        return out
+
+
 class Discriminator3(Discriminator2):
     def __init__(self):
         nn.Module.__init__(self)

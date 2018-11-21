@@ -11,7 +11,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.ndimage.filters import gaussian_filter1d
 
-from common.models import VAE, Discriminator2, Discriminator4
+from common.models import VAE, Discriminator2, Discriminator4, DiscriminatorCNN
+from common.gan_models import MnistGeneratorBN
 from common.problems import get_problem
 from common import digits_sampler
 
@@ -82,7 +83,8 @@ p.LR = 1e-3  # Adam learning rate
 p.COMBINATION_BATCH_SIZE = 12
 
 ###### Architecture
-p.ARCHITECTURE = 'Discriminator2'
+#p.ARCHITECTURE = 'Discriminator2'
+p.ARCHITECTURE = 'DiscriminatorCNN'
 #p.ARCHITECTURE = 'Discriminator4'
 
 
@@ -144,32 +146,37 @@ def export_pdf(fname, stats, smooth_window=21, fontsize=12):
     plt.savefig(fname)
 
 ##################
+# Load all GANs
+print 'Loading GANs'
+gan_visual_samplers = []
+for i in xrange(10):
+    gan = MnistGeneratorBN(latent_dim=100, filters=64)
+    state_dict = torch.load('../train_conditional/gan_conditional/netG_epoch_49 ({}).pth'.format(i),
+                            map_location=lambda storage, loc: storage)
+    gan.load_state_dict(state_dict)
+    gan_visual_samplers.append(digits_sampler.GanVisualSampler(gan))
+##################
 # Load all VAES
 print 'Loading VAEs'
-vaes = {}
 # EPOCH = 80
 EPOCH = 70
+vae_visual_samplers = []
 for i in xrange(10):
     vae = VAE()
     state_dict = torch.load('../train_conditional/vae_conditional/epoch_{}/digit_{}_epoch_{}.pth'.format(EPOCH, i, EPOCH))
     vae.load_state_dict(state_dict)
-    vaes[i] = vae
-
-# Prepare VAE visual sampler
-vae_visual_samplers = [digits_sampler.VaeVisualSampler(vaes[i]) for i in xrange(10)]
+    vae_visual_samplers.append(digits_sampler.VaeVisualSampler(vae))
 #####################################################
 print 'Loading MNIST digits'
 
 # Load individual MNIST digits
-digit_test_iter = {}
+test_visual_samplers = []
 for i in xrange(10):
     print 'Loading digit', i
     test_digit = digits_sampler.load_one_mnist_digit(i, train=False, debug=p.DEBUG_TEST)
-    digit_test_iter[i] = make_infinite(
+    digit_test_iter = make_infinite(
         torch.utils.data.DataLoader(test_digit, batch_size=1, shuffle=True))
-
-# Prepare mnist visuak sampler
-test_visual_samplers = [digits_sampler.DatasetVisualSampler(digit_test_iter[i]) for i in xrange(10)]
+    test_visual_samplers.append(digits_sampler.DatasetVisualSampler(digit_test_iter))
 #####################################################
 
 
@@ -194,7 +201,7 @@ eval_pairs['NewCombination'] = {
 }
 
 # Eval (different visual, same combination)
-eval_pairs['NewVisual'] = {
+eval_pairs['Vae'] = {
     'p_visual': test_visual_samplers,
     'q_visual': vae_visual_samplers,
     'p_symbol': sum_25.train_positive,
@@ -202,7 +209,7 @@ eval_pairs['NewVisual'] = {
 }
 
 # Eval (different visual, different combination)
-eval_pairs['NewVisualNewCombination'] = {
+eval_pairs['VaeNewCombination'] = {
     'p_visual': test_visual_samplers,
     'q_visual': vae_visual_samplers,
     'p_symbol': sum_25.test_positive,
@@ -210,13 +217,21 @@ eval_pairs['NewVisualNewCombination'] = {
 }
 
 # Eval (different visual, same combination)
-eval_pairs['NewFlippedVisualNewCombination'] = {
+eval_pairs['NewFlippedVaeNewCombination'] = {
     'p_visual': vae_visual_samplers,
     'q_visual': test_visual_samplers,
     'p_symbol': sum_25.train_positive,
     'q_symbol': sum_25.train_negative,
 }
 
+
+# Eval (different visual, different combination)
+eval_pairs['GanNewCombination'] = {
+    'p_visual': test_visual_samplers,
+    'q_visual': gan_visual_samplers,
+    'p_symbol': sum_25.test_positive,
+    'q_symbol': sum_25.test_negative,
+}
 
 ##########################################
 # Create discriminator

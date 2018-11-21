@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 
 
@@ -137,6 +138,11 @@ class MnistGeneratorBN(nn.Module):
     def forward(self, input):
         output = self.main(input)
         return output
+
+    def generate(self, batch_size):
+        noise = torch.randn(batch_size, self.latent_dim, 1, 1)
+        fake = self(noise)
+        return fake
 
 
 class MnistDiscriminator(nn.Module):
