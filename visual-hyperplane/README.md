@@ -41,6 +41,8 @@ In other words, Likelihood focuses almost exclusively on visual appearance. Ther
 #### Same experiment on GAN?
 It is *much harder* to do same experiment for GAN: divergence values are not stable and depend on network initialization and sampling of the data during SGD. Some formulations (WGAN/WGAN-GP) are more stable than others (Unregularized GAN), but in general the values are hard to compare.
 
+Besides, if the distributions are visually very different (e.g. Test-25/Vae-25), the discrimininator will converge to 100% accuracy. Of course we could prevent it of having 100% accuracy by regularizing, but the point is that the value is hard to interpret in general.
+
 
 ### 3. Evaluate if Parametric divergence (Regularized GAN) can enforce Sum-25.
 
