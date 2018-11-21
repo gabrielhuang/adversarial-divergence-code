@@ -31,7 +31,7 @@ or
 
 Then run the jupyter notebook `evaluate_joint_likelihood.ipynb`
 
-#### Main result: Likelihood fixates on visual appearance.
+#### Main result: Maximum Likelihood fixates on visual appearance.
 
 Likelihood(Test-25||VaeEpoch80-Non25) - Likelihood(Test-25||VaeEpoch70-Non25) >> 
 Likelihood(Test-25||VaeEpoch70-25) - Likelihood(Test-25||VaeEpoch70-Non25)
@@ -56,18 +56,25 @@ It is possible to distinguish those distributions solely based on the images (in
 Evaluate accuracy on telling apart:
 - Test-25/Test-Non25 to see if discriminator did learn Sum-25 constraint. The discriminator is barely able to distinguish them.
 
-*Main result*:
+#### Main result: In the GAN setting the discriminator will not enforce the constraint if generated samples are not good enough.
 
 When trained on Test-25/Vae-Non25, which simulates a GAN setting (generated digits imperfect and don't sum to 25),
 the discriminator tends to fixate on visual properties (because they allow 100% accuracy), and will not enforce the symbolic constraints.
 
-Todo:
+#### Todo
 - try with Test-25/GAN-Non25. It might have a better chance of working since the digits are better.
+
+#### Extrapolation
+This might explain why samples from GANs seem to lack global consistency as scenes. Since images are already imperfect, the discriminator can tell them apart without need to enforce any physical constraints.
 
 
 ### 4. Evaluate if Parametric divergence (Regularized GAN) can enforce Sum-25.
 
+#### Motivation: generate digits that sum up to 25.
 
+We introduce a side task (Test-25A/Test-Non25A) to force the discriminator to learn the constraint.
+
+#### Experiment
 We divide the ~6000 combinations that sum up to 25 into two disjoints sets 25A and 25B.
 We divide the remaining ~100000 combinations that do not sum up to 25 into two disjoint sets 25A and 25B.
 
@@ -82,3 +89,14 @@ cd evaluate_divergences/
 python evaluate_divergences.py  # train discriminator
 python divergence_gui.py  # plot results
 ```
+
+#### Main result: we can make discriminator enforce the constraint using a side task.
+
+This shows:
+- Test-25B/Test-Non25B: discriminator can generate new combinations and not just overfit on training combinations (good for **sample complexity**)
+- Test-25A/Vae-Non25A and Vae-25A/Test-Non25A: discriminator can enforce constraint even with distribution shift (suggests we can combine side-task with GAN).
+
+#### Todo:
+- A/B separation
+- Vae-25/Test-Non25
+- Same with GANs
