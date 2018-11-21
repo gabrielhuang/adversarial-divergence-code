@@ -16,7 +16,7 @@ There are two steps:
 
 Variational AutoEncoder, where `X=0,1,...,9`:
 
-```python train_vae_visual.py --digit X```
+```python train_vae_conditional.py --digit X```
 
 Generative Aversarial Network:
 
