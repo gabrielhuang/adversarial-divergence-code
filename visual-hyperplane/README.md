@@ -23,7 +23,11 @@ Generative Aversarial Network:
 ```python train_gan_conditional.py --digit X```
 
 
-### 2. Evaluate Likelihood
+### 2. Evaluate Sensitivity of Likelihood
+
+```cd evaluate_divergences/```
+
+Then run the jupyter notebook `evaluate_joint_likelihood.ipynb`
 
 
 
