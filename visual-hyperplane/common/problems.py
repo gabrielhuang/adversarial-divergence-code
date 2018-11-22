@@ -54,7 +54,16 @@ def make_infinite(iterable):
     while True:
         for i in iterable:
             yield i
-            
+
+TASKS = [
+    'sum_25',
+    'non_25',
+    'uniform',
+    'increasing',
+    'symmetric',
+    'even'
+]
+
 def get_problem(CONSTRAINT, ENCODING_MODE, train_ratio=0.1):
     p = Problem()
 
@@ -104,10 +113,10 @@ def get_problem(CONSTRAINT, ENCODING_MODE, train_ratio=0.1):
     p.train_positive, p.test_positive = split(positive, train_ratio)
     p.train_negative, p.test_negative = split(negative, train_ratio)
 
-    p.train_positive_iter = make_infinite(DataLoader(p.train_positive, batch_size=BATCH, shuffle=True))
-    p.test_positive_iter = make_infinite(DataLoader(p.test_positive, batch_size=BATCH, shuffle=True))
-    p.train_negative_iter = make_infinite(DataLoader(p.train_negative, batch_size=BATCH, shuffle=True))
-    p.test_negative_iter = make_infinite(DataLoader(p.test_negative, batch_size=BATCH, shuffle=True))
+    #p.train_positive_iter = make_infinite(DataLoader(p.train_positive, batch_size=BATCH, shuffle=True))
+    #p.test_positive_iter = make_infinite(DataLoader(p.test_positive, batch_size=BATCH, shuffle=True))
+    #p.train_negative_iter = make_infinite(DataLoader(p.train_negative, batch_size=BATCH, shuffle=True))
+    #p.test_negative_iter = make_infinite(DataLoader(p.test_negative, batch_size=BATCH, shuffle=True))
 
         
     return p

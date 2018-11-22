@@ -159,7 +159,7 @@ class DigitDiscriminator(nn.Module):
         return out.view(-1, 1)
 
 
-class ImageGenerator(nn.Module):
+class ConstrainedImageGenerator(nn.Module):
     def __init__(self, latent_global, latent_visual, nb_digits):
         nn.Module.__init__(self)
         self.nb_digits = nb_digits
@@ -206,7 +206,7 @@ class ImageGenerator(nn.Module):
         return samples
 
 
-class ImageDiscriminator(nn.Module):
+class ConstrainedImageDiscriminator(nn.Module):
     def __init__(self, nb_digits):
         nn.Module.__init__(self)
         self.nb_digits = nb_digits

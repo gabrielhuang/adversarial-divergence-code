@@ -145,10 +145,16 @@ class DiscriminatorCNN(nn.Module):
             nn.Linear(128, 64),
             nn.ReLU(),
             nn.Linear(64, 1),
-            nn.Sigmoid()
         )
 
+        self.sigmoid = nn.Sigmoid()
+
     def forward(self, x):
+        out = self.get_logits(x)
+        out = self.sigmoid(out)
+        return out
+
+    def get_logits(self, x):
         x_per_digit = x.view(len(x)*5, 1, 28, 28)
         embeddings = self.embedder(x_per_digit)
         embeddings_merged = embeddings.view(len(x), -1)
@@ -156,32 +162,53 @@ class DiscriminatorCNN(nn.Module):
         return out
 
 
-class Discriminator3(Discriminator2):
+class GeneratorCNN(nn.Module):
     def __init__(self):
         nn.Module.__init__(self)
 
-        self.shared = nn.Sequential(
-            nn.Linear(784, 400),
+        self.shared_dim = shared_dim = 200
+        self.digit_dim = digit_dim = 100
+        self.filters = filters = 64
+        self.dims = dims = 256
+
+        self.demuxer = nn.Sequential(
+            nn.Linear(shared_dim, dims),
             nn.ReLU(),
-            nn.Linear(400, 20),
+            nn.BatchNorm1d(dims),
+            nn.Linear(dims, dims),
             nn.ReLU(),
-            nn.Linear(20, 20),
+            nn.BatchNorm1d(dims),
+            nn.Linear(dims, dims),
+            nn.ReLU(),
+            nn.Linear(dims, 5*digit_dim),
         )
-        self.merge = nn.Sequential(
-            nn.Linear(20*5, 200),
-            nn.ReLU(),
-            nn.Linear(200, 200),
-            nn.ReLU(),
-            nn.Linear(200, 200),
-            nn.ReLU(),
-            nn.Linear(200, 1),
-            nn.Sigmoid()
+
+        self.decoder = nn.Sequential(
+            ReshapeLayer([-1, digit_dim, 1, 1]),
+            # latent:1x1
+            nn.ConvTranspose2d(digit_dim, 4*filters, 4, 1, 0),
+            nn.ReLU(True),
+            nn.BatchNorm2d(4*filters),
+            # 256:4x4
+            nn.ConvTranspose2d(4*filters, 2*filters, 4, 2, 1),
+            nn.BatchNorm2d(2*filters),
+            nn.ReLU(True),
+            # 128:8x8
+            nn.ConvTranspose2d(2*filters, filters, 4, 2, 2),
+            nn.BatchNorm2d(filters),
+            nn.ReLU(True),
+            # 64:14x14
+            nn.ConvTranspose2d(filters, 1, 4, 2, 1),
+            nn.Tanh()
+            # 1:28x28
         )
-        self.classifier = nn.Sequential(
-            nn.ReLU(),
-            nn.Linear(20, 10),
-            nn.LogSoftmax()
-        )
+
+    def forward(self, noise):
+        digit_embeddings = self.demuxer(noise).view(len(noise)*5, -1)
+        images = self.decoder(digit_embeddings)
+        images_stacked = images.view(len(noise), 5, 28, 28)
+        return images_stacked
+
 
 class Discriminator4(Discriminator2):
     def __init__(self):
