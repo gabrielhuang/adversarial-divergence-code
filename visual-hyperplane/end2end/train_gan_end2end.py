@@ -11,6 +11,7 @@ import torchvision
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.autograd import grad
+import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
 
 import sys
@@ -106,6 +107,11 @@ print problem
 #####################################################
 print 'Loading MNIST digits'
 
+transform = transforms.Compose([
+    #transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
+
 # Load individual MNIST digits
 test_visual_samplers = []
 for i in xrange(10):
@@ -150,19 +156,53 @@ fake_label = 0
 for iteration in tqdm(xrange(args.iterations)):
     start_time = time.time()
 
+    ############################
+    # Side-task
+    ############################
+    netD.zero_grad()
+
+    # Sample visual combination
+    p_digit_images = digits_sampler.sample_visual_combination(
+        problem.train_positive,
+        test_visual_samplers,
+        args.combination_batch_size)
+    q_digit_images = digits_sampler.sample_visual_combination(
+        problem.train_negative,
+        test_visual_samplers,
+        args.combination_batch_size)
+
+    # Compute output
+    p_out = netD(p_digit_images)
+    q_out = netD(q_digit_images)
+
+    p_target = torch.ones(len(p_out)).to(device)  # REAL is ONE, FAKE is ZERO
+    q_target = torch.zeros(len(q_out)).to(device)  # REAL is ONE, FAKE is ZERO
+
+    # Compute loss
+    p_loss = criterion(p_out, p_target)
+    q_loss = criterion(q_out, q_target)
+    classifier_loss = 0.5 * (p_loss + q_loss)
+    classifier_accuracy = 0.5 * ((p_out > 0.5).float().mean() + (q_out <= 0.5).float().mean())
+
+    # No penalty right now
+    side_loss = classifier_loss# + penalty_loss
+    side_loss.backward()
+
+
     ####################################
     # Sample visual combination
     real = digits_sampler.sample_visual_combination(
         problem.train_positive,
         test_visual_samplers,
-        args.combination_batch_size).to(device)
+        args.combination_batch_size,
+        transform).to(device)
 
 
     ############################
     # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
     ###########################
     # train with real
-    netD.zero_grad()
+    #netD.zero_grad()
     batch_size = real.size(0)
     label = torch.full((batch_size,), real_label, device=device)
 
@@ -202,6 +242,12 @@ for iteration in tqdm(xrange(args.iterations)):
     errG.backward()
     D_G_z2 = output.mean().item()
     optimizerG.step()
+
+
+
+    ############################
+    # Evaluation
+    ############################
 
     ############################
     # Logs
