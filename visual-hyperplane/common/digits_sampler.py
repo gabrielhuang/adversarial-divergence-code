@@ -29,7 +29,7 @@ def combination_to_visual(combination, visual_samplers, transform=None):
     visual_combination = torch.cat(x, 1)
     return visual_combination
 
-# Load only one digit from mnist
+# Load only one digit from mnist (but cache all of them)
 def load_one_mnist_digit(digit, train, debug=False):
     test_digits = []
     for i, (data, label) in enumerate(datasets.MNIST('../data', train=train, download=True, transform=transforms.ToTensor())):
@@ -39,6 +39,14 @@ def load_one_mnist_digit(digit, train, debug=False):
                 print 'WARNING THIS IS DEBUG MODE'
                 break
     return test_digits
+
+
+def load_all_mnist_digits(train):
+    all_digits = [[] for i in xrange(10)]
+    for i, (data, label) in enumerate(datasets.MNIST('../data', train=train, download=True, transform=transforms.ToTensor())):
+        all_digits[label.item()].append((data, label))
+    return all_digits
+
 
 
 def make_infinite(iterable):

@@ -61,15 +61,11 @@ parser.add_argument('--generator', default='ConstrainedImageGenerator', help='ar
 parser.add_argument('--discriminator', default='ConstrainedImageDiscriminator', help='architecture')
 #parser.add_argument('--filters', default=32, type=int, help='size of disc/gen in unconstrained case')
 
-# Other
-parser.add_argument('--DEBUG_TEST', default=1, type=int, help="don't load all digits")
 
 args = parser.parse_args()
 short = {'constrained': 'C', 'unconstrained': 'U', 'semi': 'S'}
 print args
 
-if args.DEBUG_TEST:
-    print 'DEBUG! '*30
 device = 'cuda:0' if args.cuda else 'cpu'
 #######################################
 # Create all folders
@@ -117,11 +113,11 @@ transform = transforms.Compose([
 
 # Load individual MNIST digits
 test_visual_samplers = []
+all_mnist_digit = digits_sampler.load_all_mnist_digits(train=False, debug=args.DEBUG_TEST)
 for i in xrange(10):
     print 'Loading digit', i
-    test_digit = digits_sampler.load_one_mnist_digit(i, train=False, debug=args.DEBUG_TEST)
     digit_test_iter = digits_sampler.make_infinite(
-        torch.utils.data.DataLoader(test_digit, batch_size=1, shuffle=True))
+        torch.utils.data.DataLoader(all_mnist_digit[i], batch_size=1, shuffle=True))
     test_visual_samplers.append(digits_sampler.DatasetVisualSampler(digit_test_iter))
 #####################################################
 print 'Building models'
