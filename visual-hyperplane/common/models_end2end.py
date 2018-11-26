@@ -160,7 +160,7 @@ class DigitDiscriminator(nn.Module):
 
 
 class ConstrainedImageGenerator(nn.Module):
-    def __init__(self, latent_global, latent_visual, nb_digits):
+    def __init__(self, latent_global=200, latent_visual=100, nb_digits=5):
         nn.Module.__init__(self)
         self.nb_digits = nb_digits
         self.latent_global = latent_global
@@ -207,7 +207,7 @@ class ConstrainedImageGenerator(nn.Module):
 
 
 class ConstrainedImageDiscriminator(nn.Module):
-    def __init__(self, nb_digits):
+    def __init__(self, nb_digits=5):
         nn.Module.__init__(self)
         self.nb_digits = nb_digits
         self.conv_sizes = [
@@ -234,13 +234,21 @@ class ConstrainedImageDiscriminator(nn.Module):
         self.mlp = nn.Sequential(
             *self.mlp_modules
         )
+        self.sigmoid = nn.Sigmoid()
 
-    def forward(self, input):
+    def get_logit(self, input):
         out = input.view(-1, 1, 28, 28)
         out = self.conv(out)
         out = out.view(len(input), -1)
         out = self.mlp(out)
         return out.view(-1, 1)
+
+    def forward(self, input):
+        out = self.get_logit(input)
+        out = self.sigmoid(out)
+        return out
+
+
 
 
 class UnconstrainedImageGenerator(nn.Module):

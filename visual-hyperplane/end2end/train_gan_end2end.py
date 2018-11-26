@@ -52,10 +52,13 @@ parser.add_argument('--gp', default=10., type=float, help='gradient penalty')
 parser.add_argument('--glr', default=1e-4, type=float, help='generator learning rate')
 parser.add_argument('--dlr', default=1e-4, type=float, help='discriminator learning rate')
 ##### THIS PARAMETER IS IGNORED NOW
+##### NO CONSISTENCY CHECK WITH GENERATOR@
 parser.add_argument('--latent-local', default=100, type=int, help='local latent dimensions for each image')
 parser.add_argument('--latent-global', default=200, type=int, help='global latent dimensions')
 #parser.add_argument('--model-generator', default='constrained', choices=['constrained','unconstrained'], help='c|u')
 #parser.add_argument('--model-discriminator', default='constrained', choices=['constrained','unconstrained'], help='constrained|unconstrained|semi')
+parser.add_argument('--generator', default='ConstrainedImageGenerator', help='architecture')
+parser.add_argument('--discriminator', default='ConstrainedImageDiscriminator', help='architecture')
 #parser.add_argument('--filters', default=32, type=int, help='size of disc/gen in unconstrained case')
 
 # Other
@@ -132,8 +135,11 @@ print 'Building models'
 #    netG = UnconstrainedImageGenerator(args.latent_global, 5, args.filters)
 #else:
 #    netG = ConstrainedImageGenerator(args.latent_global, args.latent_local, 5)
-netD = DiscriminatorCNN()
-netG = GeneratorCNN()
+DiscriminatorClass = eval(args.discriminator)
+GeneratorClass = eval(args.generator)
+
+netD = DiscriminatorClass()
+netG = GeneratorClass()
 
 
 netD.to(device)

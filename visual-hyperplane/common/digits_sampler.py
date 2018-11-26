@@ -5,7 +5,7 @@ from torchvision import datasets, transforms
 
 #############################
 # Combination to Visual
-def combination_to_visual(combination, visual_samplers):
+def combination_to_visual(combination, visual_samplers, transform=None):
     '''
     Sample a visual representation for a symbolic combination
 
@@ -22,6 +22,9 @@ def combination_to_visual(combination, visual_samplers):
     x = []
     for c in combination:
         sample = visual_samplers[c]()
+        assert len(sample)==1
+        if transform is not None:
+            sample[0] = transform(sample[0])
         x.append(sample)
     visual_combination = torch.cat(x, 1)
     return visual_combination
@@ -100,7 +103,7 @@ class GanVisualSampler(object):
         self.idx += 1
         return sample.detach()
 
-def sample_visual_combination(symbolic, visual, combination_batch_size):
+def sample_visual_combination(symbolic, visual, combination_batch_size, transform=None):
     samples = []
     for j in xrange(combination_batch_size):
         # Sample combination from symbolic
@@ -108,6 +111,6 @@ def sample_visual_combination(symbolic, visual, combination_batch_size):
         combination = symbolic[combination_idx]
 
         # Make visual
-        samples.append(combination_to_visual(combination, visual))
+        samples.append(combination_to_visual(combination, visual, transform))
     samples = torch.cat(samples, 0)
     return samples
