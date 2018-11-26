@@ -59,6 +59,10 @@ run_dir = '{}/gan-d{}g{}-{}'.format(args.logdir, short[args.model_discriminator]
 models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
+# Create samples dir if deosnt exist
+samples_dir = '{}/samples'.format(run_dir)
+if not os.path.exists(samples_dir):
+    os.makedirs(samples_dir)
 
 
 
@@ -265,6 +269,10 @@ for iteration in tqdm(xrange(args.iterations)):
 
         log.add_image('train', gallery_train, iteration)
         log.add_image('generation', gallery_gen, iteration)
+
+        iteration_fixed = '{:08d}'.format(iteration)
+        torchvision.utils.save_image(gallery_train, '{}/train_{}.png'.format(samples_dir, iteration_fixed))
+        torchvision.utils.save_image(gallery_gen, '{}/generated_{}.png'.format(samples_dir, iteration_fixed))
 
     # Save models
     if iteration % args.save_models == 0:
