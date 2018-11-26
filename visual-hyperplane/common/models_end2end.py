@@ -244,7 +244,7 @@ class ConstrainedImageDiscriminator(nn.Module):
         return out.view(-1, 1)
 
     def forward(self, input):
-        out = self.get_logit(input)
+        out = self.get_logits(input)
         out = self.sigmoid(out)
         return out
 
