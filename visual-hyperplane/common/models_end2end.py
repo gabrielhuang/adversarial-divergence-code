@@ -236,7 +236,7 @@ class ConstrainedImageDiscriminator(nn.Module):
         )
         self.sigmoid = nn.Sigmoid()
 
-    def get_logit(self, input):
+    def get_logits(self, input):
         out = input.view(-1, 1, 28, 28)
         out = self.conv(out)
         out = out.view(len(input), -1)

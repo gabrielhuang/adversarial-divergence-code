@@ -61,6 +61,8 @@ parser.add_argument('--generator', default='ConstrainedImageGenerator', help='ar
 parser.add_argument('--discriminator', default='ConstrainedImageDiscriminator', help='architecture')
 #parser.add_argument('--filters', default=32, type=int, help='size of disc/gen in unconstrained case')
 
+parser.add_argument('--side-task', default=1, help='Use side task')
+
 
 args = parser.parse_args()
 short = {'constrained': 'C', 'unconstrained': 'U', 'semi': 'S'}
@@ -163,32 +165,35 @@ for iteration in tqdm(xrange(args.iterations)):
     ############################
     netD.zero_grad()
 
-    # Sample visual combination
-    p_digit_images = digits_sampler.sample_visual_combination(
-        problem.train_positive,
-        test_visual_samplers,
-        args.combination_batch_size)
-    q_digit_images = digits_sampler.sample_visual_combination(
-        problem.train_negative,
-        test_visual_samplers,
-        args.combination_batch_size)
+    if args.side_task:
+        # Sample visual combination
+        p_digit_images = digits_sampler.sample_visual_combination(
+            problem.train_positive,
+            test_visual_samplers,
+            args.combination_batch_size).to(device)
+        q_digit_images = digits_sampler.sample_visual_combination(
+            problem.train_negative,
+            test_visual_samplers,
+            args.combination_batch_size).to(device)
 
-    # Compute output
-    p_out = netD(p_digit_images)
-    q_out = netD(q_digit_images)
+        # Compute output
+        p_out = netD(p_digit_images)
+        q_out = netD(q_digit_images)
 
-    p_target = torch.ones(len(p_out)).to(device)  # REAL is ONE, FAKE is ZERO
-    q_target = torch.zeros(len(q_out)).to(device)  # REAL is ONE, FAKE is ZERO
+        p_target = torch.ones(len(p_out)).to(device)  # REAL is ONE, FAKE is ZERO
+        q_target = torch.zeros(len(q_out)).to(device)  # REAL is ONE, FAKE is ZERO
 
-    # Compute loss
-    p_loss = criterion(p_out, p_target)
-    q_loss = criterion(q_out, q_target)
-    classifier_loss = 0.5 * (p_loss + q_loss)
-    classifier_accuracy = 0.5 * ((p_out > 0.5).float().mean() + (q_out <= 0.5).float().mean())
+        # Compute loss
+        p_loss = criterion(p_out, p_target)
+        q_loss = criterion(q_out, q_target)
+        classifier_loss = 0.5 * (p_loss + q_loss)
+        classifier_accuracy = 0.5 * ((p_out > 0.5).float().mean() + (q_out <= 0.5).float().mean())
 
-    # No penalty right now
-    side_loss = classifier_loss# + penalty_loss
-    side_loss.backward()
+        # No penalty right now
+        side_loss = classifier_loss# + penalty_loss
+        side_loss.backward()
+
+        log.add_scalar('sideLoss', side_loss.item(), iteration)
 
 
     ####################################
