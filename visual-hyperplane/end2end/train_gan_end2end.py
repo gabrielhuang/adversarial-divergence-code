@@ -113,7 +113,7 @@ transform = transforms.Compose([
 
 # Load individual MNIST digits
 test_visual_samplers = []
-all_mnist_digit = digits_sampler.load_all_mnist_digits(train=False, debug=args.DEBUG_TEST)
+all_mnist_digit = digits_sampler.load_all_mnist_digits(train=False)
 for i in xrange(10):
     print 'Loading digit', i
     digit_test_iter = digits_sampler.make_infinite(
