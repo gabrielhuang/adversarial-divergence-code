@@ -5,26 +5,35 @@ import matplotlib.pyplot as plt
 import numpy as np
 import hyperplane_dataset
 from tqdm import tqdm
+import os
 
-# How many old_runs_2? (samples will be divided by that number)
-n_runs = 5
-n_points = 30
+import sys
+sys.path.append('..')
+from common import digits_sampler
 
-# Load dataset
-data = 'combinations.pkl'
-with open(data, 'rb') as fp:
-    dataset = pickle.load(fp)
-full_dataset = dataset['full']
-train_dataset = dataset['train']
-test_dataset = dataset['test']
-digits = dataset['digits']
-amount = dataset['amount']
-print 'Loaded dataset {}'.format(data)
-print '    digits: {}'.format(digits)
-print '    amount: {}'.format(amount)
 
-vae_digits_filename = 'results-vae/digits.npy'
-gan_digits_filename = 'results-gan/digits.npy'
+# How many runs? (samples will be divided by that number)
+n_runs = 1  # 5 - change to more
+n_points = 3 # 30
+problem_file = '../end2end/sum_25.pkl'
+output_dir = 'plots'
+
+# Load problem
+print 'Loading problem {}'.format(problem_file)
+with open(problem_file, 'rb') as fp:
+    problem = pickle.load(fp)
+print problem
+# Compute sets
+positive_set = set(tuple(x) for x in problem.positive)
+train_positive_set = set(tuple(x) for x in problem.train_positive)
+test_positive_set = set(tuple(x) for x in problem.test_positive)
+
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+
+gan_digits_filename = 'results_wgan_side/digits.npy'
+vae_digits_filename = 'results_wgan_noside/digits.npy'
 
 vae_digits = np.load(vae_digits_filename)
 gan_digits = np.load(gan_digits_filename)
@@ -38,7 +47,7 @@ gan_sum = gan_digits.sum(axis=1)
 
 # generate baseline samples
 nb_samples = len(vae_digits)
-flat_dataset = np.array(full_dataset.hyperplane_dataset.combinations).flatten()
+flat_dataset = np.array(problem.positive).flatten()
 samples_per_run = nb_samples / n_runs
 print 'Going to do {} old_runs_2 of {} samples'.format(n_runs, samples_per_run)
 
@@ -49,8 +58,8 @@ base_digits = samples = np.random.choice(digits, size=(nb_samples, 5), p=freq)
 baseline_sum = samples.sum(axis=1)
 
 # generate perfect samples
-perfect_idx = np.random.randint(0, len(full_dataset), size=nb_samples)
-perfect_digits = np.asarray(full_dataset.hyperplane_dataset.combinations)[perfect_idx]
+perfect_idx = np.random.randint(0, len(problem.positive), size=nb_samples)
+perfect_digits = np.asarray(problem.positive)[perfect_idx]
 
 x_baseline, height_baseline = np.unique(baseline_sum, return_counts=True)
 height_baseline = height_baseline/float(len(baseline_sum)) * 100
@@ -78,11 +87,11 @@ plt.xlabel('sum of digits')
 plt.ylabel('$\%$ frequency')
 plt.legend(loc='best')
 plt.xticks([0,10,20,25,30,40], ['0','10','20', r'\textbf{25}','30','40'])
-plt.savefig('sum_digits_dist.pdf')
+plt.savefig('{}/sum_digits_dist.pdf'.format(output_dir))
 
 # RECALL
 def get_recall(samples, dataset):
-    intersection = [tuple(c) for c in samples if tuple(c) in dataset.set]
+    intersection = [tuple(c) for c in samples if tuple(c) in dataset]
     unique = set(intersection)
     return len(unique) / float(len(dataset))
 
@@ -112,20 +121,20 @@ for run in xrange(n_runs):
         i = run*samples_per_run # starter index
 
         #recall_vae_full = get_recall(vae_digits[i:i+n_samples], full_dataset)
-        recall_vae_train = get_recall(vae_digits[i:i+n_samples], train_dataset)
-        recall_vae_test = get_recall(vae_digits[i:i+n_samples], test_dataset)
+        recall_vae_train = get_recall(vae_digits[i:i+n_samples], train_positive_set)
+        recall_vae_test = get_recall(vae_digits[i:i+n_samples], test_positive_set)
 
         #recall_gan_full = get_recall(gan_digits[i:i+n_samples], full_dataset)
-        recall_gan_train = get_recall(gan_digits[i:i+n_samples], train_dataset)
-        recall_gan_test = get_recall(gan_digits[i:i+n_samples], test_dataset)
+        recall_gan_train = get_recall(gan_digits[i:i+n_samples], train_positive_set)
+        recall_gan_test = get_recall(gan_digits[i:i+n_samples], test_positive_set)
 
         #recall_base_full = get_recall(base_digits[i:i+n_samples], full_dataset)
-        recall_base_train = get_recall(base_digits[i:i+n_samples], train_dataset)
-        recall_base_test = get_recall(base_digits[i:i+n_samples], test_dataset)
+        recall_base_train = get_recall(base_digits[i:i+n_samples], train_positive_set)
+        recall_base_test = get_recall(base_digits[i:i+n_samples], test_positive_set)
 
         #recall_perfect_full = get_recall(perfect_digits[i:i+n_samples], full_dataset)
-        recall_perfect_train = get_recall(perfect_digits[i:i+n_samples], train_dataset)
-        recall_perfect_test = get_recall(perfect_digits[i:i+n_samples], test_dataset)
+        recall_perfect_train = get_recall(perfect_digits[i:i+n_samples], train_positive_set)
+        recall_perfect_test = get_recall(perfect_digits[i:i+n_samples], test_positive_set)
 
         # accumulate
         l_samples.append(n_samples)
@@ -191,7 +200,7 @@ params = {'text.usetex': True,
           }
 plt.rcParams.update(params)
 
-l_samples_norm = l_samples / float(len(full_dataset))
+l_samples_norm = l_samples / float(len(problem.positive))
 
 plt.plot(l_samples_norm, l_gan_test, '-o', alpha=0.6, color='green', label='GAN (test)')
 plt.plot(l_samples_norm, l_gan_train, '-o', alpha=0.6, color='green', label='GAN (train)', linestyle='--')
@@ -208,7 +217,7 @@ plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='
 plt.xlabel('samples generated / number of total combinations')
 plt.ylabel('recall')
 plt.legend(loc='best')
-plt.savefig('recall.pdf')
+plt.savefig('{}/recall.pdf'.format(output_dir))
 
 
 
@@ -223,7 +232,7 @@ params = {'text.usetex': True,
           }
 plt.rcParams.update(params)
 
-l_samples_norm = l_samples / float(len(full_dataset))
+l_samples_norm = l_samples / float(len(problem.positive))
 
 plt.plot(l_samples_norm, l_gan_test, '-o', alpha=0.6, color='green', label='GAN (test)')
 plt.plot(l_samples_norm, l_gan_train, '-o', alpha=0.6, color='green', label='GAN (train)', linestyle='--')
@@ -238,5 +247,5 @@ plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='
 plt.xlabel('samples generated / number of total combinations')
 plt.ylabel('recall')
 plt.legend(loc='best')
-plt.savefig('recall_merged.pdf')
+plt.savefig('{}/recall_merged.pdf'.format(output_dir))
 

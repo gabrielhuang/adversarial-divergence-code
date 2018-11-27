@@ -1,7 +1,5 @@
 import json
 import os
-from models_gan import MNISTNet
-from models import VAE
 import torch
 import torchvision
 import numpy as np
@@ -9,10 +7,14 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import argparse
 
+import sys
+sys.path.append('..')
+from common.models_gan import ImageDiscriminator, ImageGenerator, UnconstrainedImageDiscriminator, UnconstrainedImageGenerator, SemiSupervisedImageDiscriminator
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--iterations', default=70, type=int)
 parser.add_argument('--batch-size', default=1000, type=int)
-parser.add_argument('--use-cuda', default=1, type=int)
+parser.add_argument('--cuda', default=1, type=int)
 parser.add_argument('--model', required=True, help='path to generator.torch')
 parser.add_argument('--digits', default=5, help='number of digits')
 parser.add_argument('--classifier', default='trained_models/mnist_classifier.torch', help='number of latent dimensions')
@@ -33,11 +35,11 @@ classifier.eval()
 digits_list = []
 softmax_list = []
 
-if args.use_cuda:
+if args.cuda:
     netG.cuda()
 
 for i in tqdm(xrange(args.iterations)):
-    samples = netG.generate(args.batch_size, use_cuda=args.use_cuda).cpu()
+    samples = netG.generate(args.batch_size, use_cuda=args.cuda).cpu()
     size = samples.size()
     samples = samples.view(-1, 1, size[-2], size[-1])
     logits = classifier(samples)
