@@ -3,7 +3,7 @@ import time
 from tqdm import tqdm
 import argparse
 import json
-import cPickle as pickle
+import pickle
 import torch
 from torch import nn
 from torch.autograd import Variable
@@ -12,8 +12,11 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.autograd import grad
 from tensorboardX import SummaryWriter  # install with pip install git+https://github.com/lanpa/tensorboard-pytorch
-from models_gan import ImageDiscriminator, ImageGenerator, UnconstrainedImageDiscriminator, UnconstrainedImageGenerator, SemiSupervisedImageDiscriminator
-from hyperplane_dataset import get_full_train_test, HyperplaneImageDataset
+
+import sys
+sys.path.append('..')
+from common import digits_sampler
+from common.models_gan import ImageDiscriminator, ImageGenerator, UnconstrainedImageDiscriminator, UnconstrainedImageGenerator, SemiSupervisedImageDiscriminator
 
 parser = argparse.ArgumentParser(description='Train GAN with visual hyperplane')
 
@@ -21,7 +24,7 @@ parser = argparse.ArgumentParser(description='Train GAN with visual hyperplane')
 parser.add_argument('--iterations', default=100000, type=int, help='iterations')
 parser.add_argument('--batch_size', default=64, type=int, help='minibatch size')
 parser.add_argument('--threads', default=8, type=int, help='number of threads for data loading')
-parser.add_argument('--logdir', required=True, help='where to log samples and models')
+parser.add_argument('--logdir', default='log_visual', help='where to log samples and models')
 parser.add_argument('--save-samples', default=100, type=int, help='save samples every')
 parser.add_argument('--save-models', default=1000, type=int, help='save models every')
 parser.add_argument('--log-every', default=100, type=int, help='log every N iterations')
@@ -32,7 +35,7 @@ parser.add_argument('--mnist', default='data', help='folder where MNIST is/will 
 parser.add_argument('--sample-rows', default=10, type=int, help='how many samples in tensorboard')
 
 # task specific
-parser.add_argument('--data', default='combinations.pkl', help='pickled dataset')
+parser.add_argument('--data', default='sum_25.pkl', help='pickled dataset')
 
 # WGAN-GP specific
 parser.add_argument('-p', '--penalty', default=10., type=float, help='gradient penalty')
@@ -46,15 +49,22 @@ parser.add_argument('--model-generator', default='constrained', help='constraine
 parser.add_argument('--model-discriminator', default='constrained', help='constrained|unconstrained|semi')
 parser.add_argument('--unconstrained-size', default=32, type=int, help='size of disc/gen in unconstrained case')
 
+parser.add_argument('--side-task', required=True, type=int, help='whether to use side task')
+
 args = parser.parse_args()
 assert args.model_generator in ['constrained', 'unconstrained']
 assert args.model_discriminator in ['constrained', 'unconstrained', 'semi']
 short = {'constrained': 'C', 'unconstrained': 'U', 'semi': 'S'}
 print args
 
+device = 'cuda:0' if args.cuda else 'cpu'
+
+
 date = time.strftime('%Y-%m-%d.%H%M')
-run_dir = '{}/gan-d{}g{}-{}'.format(args.logdir, short[args.model_discriminator],
-                                short[args.model_generator], date)
+run_dir = '{}/gan-d{}g{}{}-{}'.format(args.logdir, short[args.model_discriminator],
+                                short[args.model_generator],
+                                'SIDE' if args.side_task else 'NOSIDE',
+                                    date)
 # Create models dir if deosnt exist
 models_dir = '{}/models'.format(run_dir)
 if not os.path.exists(models_dir):
@@ -111,33 +121,24 @@ def get_gradient_penalty(netD, real_data, fake_data, double_sided, cuda):
 
     return gradient_penalty
 
-
-# Load dataset
+#####################################################
+# Load data for side task
+# Load individual MNIST digits
+test_visual_samplers = []
+all_mnist_digit = digits_sampler.load_all_mnist_digits(train=False)
+for i in xrange(10):
+    print 'Loading digit', i
+    digit_test_iter = digits_sampler.make_infinite(
+        torch.utils.data.DataLoader(all_mnist_digit[i], batch_size=1, shuffle=True))
+    test_visual_samplers.append(digits_sampler.DatasetVisualSampler(digit_test_iter))
+print 'Not using any transforms, ensure models match that assumption!'
+#####################################################
+print 'Loading problem {}'.format(args.data)
 with open(args.data, 'rb') as fp:
-    dataset = pickle.load(fp)
-full = dataset['full']
-train = dataset['train']
-test = dataset['test']
-args.digits = dataset['digits']
-args.amount = dataset['amount']
-print 'Loaded dataset {}'.format(args.data)
-print '    digits: {}'.format(args.digits)
-print '    amount: {}'.format(args.amount)
+    problem = pickle.load(fp)
+print problem
+#####################################################
 
-train_visual = HyperplaneImageDataset(train, args.mnist, train=True)
-test_visual = HyperplaneImageDataset(test, args.mnist, train=False)
-train_loader = DataLoader(train_visual, batch_size=args.batch_size, shuffle=True)
-test_loader = DataLoader(test_visual, batch_size=args.batch_size, shuffle=True)
-
-
-def infinite_data(loader):
-    while True:
-        for data in loader:
-            yield data
-
-
-train_iter = infinite_data(train_loader)
-test_iter = infinite_data(test_loader)
 
 # Dump parameters
 with open('{}/args.json'.format(run_dir), 'wb') as f:
@@ -145,15 +146,15 @@ with open('{}/args.json'.format(run_dir), 'wb') as f:
 
 # Prepare models
 if args.model_discriminator == 'unconstrained':
-    netD = UnconstrainedImageDiscriminator(args.digits, args.unconstrained_size)
+    netD = UnconstrainedImageDiscriminator(5, args.unconstrained_size)
 elif args.model_discriminator == 'constrained':
-    netD = ImageDiscriminator(args.digits)
+    netD = ImageDiscriminator(5)
 elif args.model_discriminator == 'semi':
-    netD = SemiSupervisedImageDiscriminator(args.digits)
+    raise 'Removed'
 if args.model_generator == 'unconstrained':
-    netG = UnconstrainedImageGenerator(args.latent_global, args.digits, args.unconstrained_size)
+    netG = UnconstrainedImageGenerator(args.latent_global, 5, args.unconstrained_size)
 else:
-    netG = ImageGenerator(args.latent_global, args.latent_local, args.digits)
+    netG = ImageGenerator(args.latent_global, args.latent_local, 5)
 
 if args.cuda:
     netD = netD.cuda()
@@ -174,6 +175,11 @@ nll_criterion = nn.NLLLoss()
 ######################
 # Main loop
 ######################
+modes = ['realfake']
+if args.side_task:
+    modes.append('sidetask')
+label_ones = torch.ones((args.batch_size,), device=device)
+label_zeros = torch.zeros((args.batch_size,), device=device)
 for iteration in tqdm(xrange(args.iterations)):
     start_time = time.time()
 
@@ -185,46 +191,49 @@ for iteration in tqdm(xrange(args.iterations)):
     for p in netD.parameters():  # reset requires_grad
         p.requires_grad = True  # they are set to False below in netG update
 
-    for iter_d in xrange(args.critic_iterations):
-        # Real data
-        real_data, real_labels = train_iter.next()
-        if args.cuda:
-            real_data = real_data.cuda()
-            real_labels = real_labels.cuda()
-        real_data = Variable(real_data)
-        real_labels = Variable(real_labels)
-        if len(real_data) != args.batch_size:
-            # the last batch might be smaller, skip it
-            continue
-        D_real = netD(real_data).mean()
+    for mode in modes:
+        for iter_d in xrange(args.critic_iterations):
+            # We are guaranteed to get batch_size args.batch_size
+            if mode == 'realfake':
+                # Sample visual combination
+                real_data = digits_sampler.sample_visual_combination(
+                    problem.train_positive,
+                    test_visual_samplers,
+                    args.batch_size).to(device)
 
-        # Fake data
-        # volatile: do not compute gradient for netG
-        # stop gradient at fake_data
-        fake_data = Variable(netG.generate(args.batch_size, use_cuda=args.cuda, volatile=True).data)
-        D_fake = netD(fake_data).mean()
+                # Fake data
+                # volatile: do not compute gradient for netG
+                # stop gradient at fake_data
+                fake_data = netG.generate(args.batch_size, use_cuda=args.cuda, volatile=True)
 
-        # Costs
-        gradient_penalty = args.penalty * get_gradient_penalty(
-            netD, real_data.data, fake_data.data, double_sided=args.double_sided, cuda=args.cuda)
-        D_cost = D_fake - D_real + gradient_penalty
-        Wasserstein_D = D_real - D_fake
+            elif mode =='sidetask':
+                # Sample visual combination
+                real_data = digits_sampler.sample_visual_combination(
+                    problem.train_positive,
+                    test_visual_samplers,
+                    args.batch_size).to(device)
+                fake_data = digits_sampler.sample_visual_combination(
+                    problem.train_negative,
+                    test_visual_samplers,
+                    args.batch_size).to(device)
 
-        if args.model_discriminator == 'semi':
-            #import pdb pdb.set_trace()
-            prediction = netD.get_prediction()
-            ground_truth = real_labels.view(-1)
-            classification_cost = nll_criterion(prediction, ground_truth)
-            D_cost += classification_cost
-            indices = np.argmax(prediction.cpu().numpy(), axis=1)
-            accuracy = (indices == ground_truth.data.cpu().numpy()).mean()
-            log.add_scalar('semiSupervisedCost', classification_cost.cpu().data.numpy(), iteration)
-            log.add_scalar('semiSupervisedAccuracy', classification_cost.cpu().data.numpy(), iteration)
+            D_real = netD(real_data).mean()
+            D_fake = netD(fake_data.detach()).mean()
 
-        # Train D but not G
-        netD.zero_grad()
-        D_cost.backward()
-        optimizerD.step()
+            # Costs
+            gradient_penalty = args.penalty * get_gradient_penalty(
+                netD, real_data.data, fake_data.data, double_sided=args.double_sided, cuda=args.cuda)
+            D_cost = D_fake - D_real + gradient_penalty
+            Wasserstein_D = D_real - D_fake
+
+            # Train D but not G
+            netD.zero_grad()
+            D_cost.backward()
+            optimizerD.step()
+
+            log.add_scalar('{}.discriminatorCost'.format(mode), D_cost.cpu().data.numpy(), iteration)
+            log.add_scalar('{}.wasserstein'.format(mode), Wasserstein_D.cpu().data.numpy(), iteration)
+            log.add_scalar('{}.gradientPenalty'.format(mode), gradient_penalty.cpu().data.numpy(), iteration)
 
 
     ############################
@@ -250,10 +259,7 @@ for iteration in tqdm(xrange(args.iterations)):
 
     # Write logs and save samples
     log.add_scalar('timePerIteration', time.time()-start_time, iteration)
-    log.add_scalar('discriminatorCost', D_cost.cpu().data.numpy(), iteration)
     log.add_scalar('generatorCost', G_cost.cpu().data.numpy(), iteration)
-    log.add_scalar('wasserstein', Wasserstein_D.cpu().data.numpy(), iteration)
-    log.add_scalar('gradientPenalty', gradient_penalty.cpu().data.numpy(), iteration)
 
     # Reconstructions
     if iteration % args.save_samples == 0:
@@ -264,8 +270,8 @@ for iteration in tqdm(xrange(args.iterations)):
         view_train = view_samples(real_data.data, args.sample_rows)
         view_gen = view_samples(samples.data, args.sample_rows)
 
-        gallery_train = torchvision.utils.make_grid(view_train, nrow=args.digits, normalize=True, range=(0, 1))
-        gallery_gen = torchvision.utils.make_grid(view_gen, nrow=args.digits, normalize=True, range=(0, 1))
+        gallery_train = torchvision.utils.make_grid(view_train, nrow=5, normalize=True, range=(0, 1))
+        gallery_gen = torchvision.utils.make_grid(view_gen, nrow=5, normalize=True, range=(0, 1))
 
         log.add_image('train', gallery_train, iteration)
         log.add_image('generation', gallery_gen, iteration)

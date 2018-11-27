@@ -170,11 +170,13 @@ for iteration in tqdm(xrange(args.iterations)):
         p_digit_images = digits_sampler.sample_visual_combination(
             problem.train_positive,
             test_visual_samplers,
-            args.combination_batch_size).to(device)
+            args.combination_batch_size,
+            transform).to(device)
         q_digit_images = digits_sampler.sample_visual_combination(
             problem.train_negative,
             test_visual_samplers,
-            args.combination_batch_size).to(device)
+            args.combination_batch_size,
+            transform).to(device)
 
         # Compute output
         p_out = netD(p_digit_images)
