@@ -109,7 +109,7 @@ def get_loss_mse(data, r_data, mu, logvar):
 
 
 def get_loss_bce(data, r_data, mu, logvar):
-    BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), size_average=False)
+    BCE = F.binary_cross_entropy(r_data.view(len(r_data), -1), data.view(len(data), -1), size_average=False)
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR,
@@ -118,7 +118,9 @@ def get_loss_bce(data, r_data, mu, logvar):
     # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
-    return BCE + KLD
+    loss = KLD + BCE
+
+    return KLD, BCE, loss
 
 
 def view_samples(data, max_samples=None):
@@ -168,9 +170,9 @@ for iteration in tqdm(xrange(args.iterations)):
         view_train = view_samples(data.data, args.sample_rows)
 
         gallery_rec = torchvision.utils.make_grid(view_rec,
-            nrow=args.digits, normalize=True, range=(0,1))
+            nrow=5, normalize=True, range=(0,1))
         gallery_train = torchvision.utils.make_grid(view_train,
-            nrow=args.digits, normalize=True, range=(0,1))
+            nrow=5, normalize=True, range=(0,1))
         log.add_image('train', gallery_train, iteration)
         log.add_image('reconstruction', gallery_rec, iteration)
 
@@ -178,7 +180,7 @@ for iteration in tqdm(xrange(args.iterations)):
         samples = vae.generate(args.sample_rows, use_cuda=args.cuda)
         view_gen = view_samples(samples.data, args.generate_samples)
         gallery_gen = torchvision.utils.make_grid(view_gen,
-            nrow=args.digits, normalize=True, range=(0,1))
+            nrow=5, normalize=True, range=(0,1))
         log.add_image('generation', gallery_gen, iteration)
 
         iteration_fixed = '{:08d}'.format(iteration)
@@ -194,9 +196,12 @@ for iteration in tqdm(xrange(args.iterations)):
 
     # Evaluate
     if iteration % args.validate_every == 0:
-        data, label = test_iter.next()
-        if args.cuda:
-            data = data.cuda()
+        # Sample visual combination
+        data = digits_sampler.sample_visual_combination(
+            problem.test_positive,
+            test_visual_samplers,
+            args.batch_size).to(device)
+
         data = Variable(data)
         r_data, mu, logvar = vae(data)
         KLD, MSE, loss = get_loss_bce(data, r_data, mu, logvar)
