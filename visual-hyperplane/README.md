@@ -98,7 +98,32 @@ This shows:
 - Test-25B/Test-Non25B: discriminator can generate new combinations and not just overfit on training combinations (good for **sample complexity**)
 - Test-25A/Vae-Non25A and Vae-25A/Test-Non25A: discriminator can enforce constraint even with distribution shift (suggests we can combine side-task with GAN).
 
+## End to end training
+
+### 1. Train models
+
+```
+cd end2end/
+python train_vae_visual.py
+python train_gan_visual.py --side-task 1
+python train_gan_visual.py --side-task 0
+```
+
+### 2. Analyze results and plot
+
+```
+cd analyze/
+python count.py --model trained_models/wgan_side.torch --batch-size 100 results_wgan_side
+python count.py --model trained_models/wgan_noside.torch --batch-size 100 results_wgan_noside
+python count.py --model trained_models/vae-99000.torch --batch-size 100 results_vae
+# creates folders analyze/results_wgan_side, ...
+
+python plot_barchart.py
+# get plots in analyze/plots
+```
+
+
 #### Todo:
-- A/B separation
-- Vae-25/Test-Non25
-- Same with GANs
+- A/B separation DONE
+- Vae-25/Test-Non25 DONE (flipped)
+- Same with GANs DONE
