@@ -5,10 +5,14 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.autograd import Variable
 from tqdm import tqdm
+import os
 
 import sys
 sys.path.append('..')
 from common.models_gan import MNISTNet
+
+if not os.path.exists('log_visual'):
+    os.makedirs('log_visual')
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
@@ -90,5 +94,5 @@ for epoch in tqdm(range(1, args.epochs + 1)):
     test()
 
 print 'Saving models'
-torch.save(model, 'trained_models/mnist_classifier.torch')
+torch.save(model, 'log_visual/mnist_classifier.torch')
 
