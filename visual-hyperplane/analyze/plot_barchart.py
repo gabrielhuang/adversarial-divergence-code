@@ -6,6 +6,7 @@ import numpy as np
 import hyperplane_dataset
 from tqdm import tqdm
 import os
+from collections import OrderedDict
 
 import sys
 sys.path.append('..')
@@ -14,7 +15,7 @@ from common import digits_sampler
 
 # How many runs? (samples will be divided by that number)
 n_runs = 1  # 5 - change to more
-n_points = 3 # 30
+n_points = 5 # 30
 problem_file = '../end2end/sum_25.pkl'
 output_dir = 'plots'
 
@@ -31,45 +32,47 @@ test_positive_set = set(tuple(x) for x in problem.test_positive)
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
+# Result files
+models = OrderedDict([
+    ('GAN-SideTask', {'filename': 'results_wgan_side/digits.npy', 'color': 'xkcd:green', 'symbol':'-x'}),
+    ('GAN', {'filename': 'results_wgan_noside/digits.npy', 'color': 'xkcd:blue', 'symbol':'-o'}),
+    ('VAE', {'filename': 'results_vae/digits.npy', 'color': 'xkcd:red', 'symbol':'->'}),
+])
 
-gan_digits_filename = 'results_wgan_side/digits.npy'
-vae_digits_filename = 'results_wgan_noside/digits.npy'
+# Load digits
+for key, val in models.items():
+    val['digits'] = np.load(val['filename'])
 
-vae_digits = np.load(vae_digits_filename)
-gan_digits = np.load(gan_digits_filename)
-
-#vae_digits = vae_digits[:100000]
-#gan_digits = gan_digits[:100000]
-
-vae_sum = vae_digits.sum(axis=1)
-gan_sum = gan_digits.sum(axis=1)
-
+# This has to be the minimum
+nb_samples = len(models['VAE']['digits'])
 
 # generate baseline samples
-nb_samples = len(vae_digits)
 flat_dataset = np.array(problem.positive).flatten()
 samples_per_run = nb_samples / n_runs
-print 'Going to do {} old_runs_2 of {} samples'.format(n_runs, samples_per_run)
+print 'Going to do {} runs of {} samples'.format(n_runs, samples_per_run)
 
 digits, freq = np.unique(flat_dataset, return_counts=True)
 freq = freq / float(len(flat_dataset))
 
-base_digits = samples = np.random.choice(digits, size=(nb_samples, 5), p=freq)
-baseline_sum = samples.sum(axis=1)
+models['Baseline'] = {}
+models['Baseline']['digits'] = np.random.choice(digits, size=(nb_samples, 5), p=freq)
+models['Baseline']['color'] = 'xkcd:gray'
+models['Baseline']['symbol'] = '-s'
 
 # generate perfect samples
+models['Perfect'] = {}
 perfect_idx = np.random.randint(0, len(problem.positive), size=nb_samples)
-perfect_digits = np.asarray(problem.positive)[perfect_idx]
+models['Perfect']['digits'] = np.asarray(problem.positive)[perfect_idx]
+models['Perfect']['color'] = 'xkcd:black'
+models['Perfect']['symbol'] = '-d'
 
-x_baseline, height_baseline = np.unique(baseline_sum, return_counts=True)
-height_baseline = height_baseline/float(len(baseline_sum)) * 100
-x_gan, height_gan = np.unique(gan_sum, return_counts=True)
-height_gan = height_gan/float(len(gan_sum)) * 100
+# Count sums
+width = 1. / (len(models) + 1)
+for key, val in models.items():
+    val['sum'] = val['digits'].sum(axis=1)
+    val['x'], val['height'] = np.unique(val['sum'], return_counts=True)
+    val['height'] = val['height'] / float(len(val['sum'])) * 100
 
-x_vae, height_vae = np.unique(vae_sum, return_counts=True)
-height_vae = height_vae/float(len(vae_sum)) * 100
-
-width = 0.30
 
 plt.clf()
 plt.rcParams['text.latex.preamble'] = [r"\usepackage{lmodern}"]
@@ -80,9 +83,10 @@ params = {'text.usetex': True,
           }
 plt.rcParams.update(params)
 
-plt.bar(x_gan, height_gan, width=width, alpha=0.6, color='green', label='GAN')
-plt.bar(x_vae + width, height_vae, width=width, alpha=0.6, color='red', label='VAE')
-plt.bar(x_baseline + 2*width, height_baseline, width=width, alpha=0.6, color='gray', label='Indep. Baseline')
+for i, (model, val) in enumerate(models.items()):
+    if model != 'Perfect':
+        plt.bar(val['x'] + i*width, val['height'], width=width, alpha=0.6, color=val['color'], label=model)
+
 plt.xlabel('sum of digits')
 plt.ylabel('$\%$ frequency')
 plt.legend(loc='best')
@@ -96,98 +100,44 @@ def get_recall(samples, dataset):
     unique = set(intersection)
     return len(unique) / float(len(dataset))
 
-l_vae_train = []
-l_vae_test = []
-l_gan_train = []
-l_gan_test = []
-l_base_train = []
-l_base_test = []
-l_perfect_train = []
-l_perfect_test = []
-for run in xrange(n_runs):
-    print 'Run {} of {}'.format(run, n_runs)
+for model, val in models.items():
+    print 'Getting recall for', model
+    val['train_recalls'] = []
 
-    l_samples = []
-    r_vae_train = []
-    r_vae_test = []
-    r_gan_train = []
-    r_gan_test = []
-    r_base_train = []
-    r_base_test = []
-    r_perfect_train = []
-    r_perfect_test = []
-    for sample_ratio in tqdm(np.linspace(0, 1, n_points)):
-        N = samples_per_run
-        n_samples = max(1, min(int(sample_ratio*N), N))
-        i = run*samples_per_run # starter index
+    all_train_recalls = []
+    all_test_recalls = []
 
-        #recall_vae_full = get_recall(vae_digits[i:i+n_samples], full_dataset)
-        recall_vae_train = get_recall(vae_digits[i:i+n_samples], train_positive_set)
-        recall_vae_test = get_recall(vae_digits[i:i+n_samples], test_positive_set)
+    for run in xrange(n_runs):
+        print '\tRun {} of {}'.format(run, n_runs)
+        train_recalls = []
+        test_recalls = []
+        samples = []
 
-        #recall_gan_full = get_recall(gan_digits[i:i+n_samples], full_dataset)
-        recall_gan_train = get_recall(gan_digits[i:i+n_samples], train_positive_set)
-        recall_gan_test = get_recall(gan_digits[i:i+n_samples], test_positive_set)
+        for sample_ratio in tqdm(np.linspace(0, 1, n_points)):
+            N = samples_per_run
+            n_samples = max(1, min(int(sample_ratio*N), N))
+            i = run*samples_per_run # starter index
 
-        #recall_base_full = get_recall(base_digits[i:i+n_samples], full_dataset)
-        recall_base_train = get_recall(base_digits[i:i+n_samples], train_positive_set)
-        recall_base_test = get_recall(base_digits[i:i+n_samples], test_positive_set)
+            subset = val['digits'][i:i+n_samples]
+            train_recall = get_recall(subset, train_positive_set)
+            test_recall = get_recall(subset, test_positive_set)
 
-        #recall_perfect_full = get_recall(perfect_digits[i:i+n_samples], full_dataset)
-        recall_perfect_train = get_recall(perfect_digits[i:i+n_samples], train_positive_set)
-        recall_perfect_test = get_recall(perfect_digits[i:i+n_samples], test_positive_set)
+            # accumulate
+            samples.append(n_samples)
+            train_recalls.append(train_recall)
+            test_recalls.append(test_recall)
 
-        # accumulate
-        l_samples.append(n_samples)
-        r_vae_train.append(recall_vae_train)
-        r_vae_test.append(recall_vae_test)
-        r_gan_train.append(recall_gan_train)
-        r_gan_test.append(recall_gan_test)
-        r_base_train.append(recall_base_train)
-        r_base_test.append(recall_base_test)
-        r_perfect_train.append(recall_perfect_train)
-        r_perfect_test.append(recall_perfect_test)
+        all_train_recalls.append(train_recalls)
+        all_test_recalls.append(test_recalls)
 
-    l_samples = np.asarray(l_samples)
+    val['train_recalls_mean'] = np.mean(all_train_recalls, axis=0)
+    val['test_recalls_mean'] = np.mean(all_test_recalls, axis=0)
 
-    l_vae_train.append(r_vae_train)
-    l_vae_test.append(r_vae_test)
-    l_gan_train.append(r_gan_train)
-    l_gan_test.append(r_gan_test)
-    l_base_train.append(r_base_train)
-    l_base_test.append(r_base_test)
-    l_perfect_train.append(r_perfect_train)
-    l_perfect_test.append(r_perfect_test)
 
-    print 'n_samples', n_samples
-l_vae_train = np.mean(l_vae_train, axis=0)
-l_vae_test = np.mean(l_vae_test, axis=0)
-l_gan_train = np.mean(l_gan_train, axis=0)
-l_gan_test = np.mean(l_gan_test, axis=0)
-l_base_train = np.mean(l_base_train, axis=0)
-l_base_test = np.mean(l_base_test, axis=0)
-l_perfect_train = np.mean(l_perfect_train, axis=0)
-l_perfect_test = np.mean(l_perfect_test, axis=0)
-
-print 'Baseline recalls:'
-#print '\tfull', recall_base_full
-print '\ttrain', recall_base_train
-print '\ttest', recall_base_test
-
-print 'VAE recalls:'
-#print '\tfull', recall_vae_full
-print '\ttrain', recall_vae_train
-print '\ttest', recall_vae_test
-
-print 'GAN recalls:'
-#print '\tfull', recall_gan_full
-print '\ttrain', recall_gan_train
-print '\ttest', recall_gan_test
-
-print 'Perfect recalls:'
-#print '\tfull', recall_perfect_full
-print '\ttrain', recall_perfect_train
-print '\ttest', recall_perfect_test
+for model, val in models.items():
+    print '{} recalls:'.format(model)
+    print '\ttrain', val['train_recalls_mean']
+    print '\ttest', val['test_recalls_mean']
 
 
 # Make actual figure (full train test)
@@ -195,58 +145,24 @@ plt.figure()
 plt.clf()
 plt.rcParams['text.latex.preamble'] = [r"\usepackage{lmodern}"]
 params = {'text.usetex': True,
-          'font.size': 15,
+          'font.size': 12,
           'font.family': 'lmodern',
           'text.latex.unicode': True,
           }
 plt.rcParams.update(params)
 
-l_samples_norm = l_samples / float(len(problem.positive))
+samples_norm = np.asarray(samples) / float(len(problem.positive))
 
-plt.plot(l_samples_norm, l_gan_test, '-o', alpha=0.6, color='green', label='GAN (test)')
-plt.plot(l_samples_norm, l_gan_train, '-o', alpha=0.6, color='green', label='GAN (train)', linestyle='--')
-
-plt.plot(l_samples_norm, l_vae_test, '->', alpha=0.6, color='red', label='VAE (test)')
-plt.plot(l_samples_norm, l_vae_train, '->', alpha=0.6, color='red', label='VAE (train)', linestyle='--')
-
-plt.plot(l_samples_norm, l_base_test, '-s', alpha=0.6, color='gray', label='Indep. Baseline (test)')
-plt.plot(l_samples_norm, l_base_train, '-s', alpha=0.6, color='gray', label='Indep. Baseline (train)', linestyle='--')
-
-plt.plot(l_samples_norm, l_perfect_test, '-d', alpha=0.6, color='blue', label='Perfect (test)')
-plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='Perfect (train)', linestyle='--')
+for model, val in models.items():
+    if model in ['Baseline', 'Perfect']:
+        plt.plot(samples_norm, val['test_recalls_mean'], val['symbol'], alpha=0.6, color=val['color'], label='{}'.format(model))
+    else:
+        plt.plot(samples_norm, val['test_recalls_mean'], val['symbol'], alpha=0.6, color=val['color'], label='{}'.format(model))
+        plt.plot(samples_norm, val['train_recalls_mean'], val['symbol'], alpha=0.6, color=val['color'], linestyle='--')
+        #plt.plot(samples_norm, val['test_recalls_mean'], val['symbol'], alpha=0.6, color=val['color'], label='{} (test)'.format(model))
+        #plt.plot(samples_norm, val['train_recalls_mean'], val['symbol'], alpha=0.6, color=val['color'], label='{} (train)'.format(model), linestyle='--')
 
 plt.xlabel('samples generated / number of total combinations')
 plt.ylabel('recall')
 plt.legend(loc='best')
 plt.savefig('{}/recall.pdf'.format(output_dir))
-
-
-
-# Make actual figure (merged train_test)
-plt.figure()
-plt.clf()
-plt.rcParams['text.latex.preamble'] = [r"\usepackage{lmodern}"]
-params = {'text.usetex': True,
-          'font.size': 15,
-          'font.family': 'lmodern',
-          'text.latex.unicode': True,
-          }
-plt.rcParams.update(params)
-
-l_samples_norm = l_samples / float(len(problem.positive))
-
-plt.plot(l_samples_norm, l_gan_test, '-o', alpha=0.6, color='green', label='GAN (test)')
-plt.plot(l_samples_norm, l_gan_train, '-o', alpha=0.6, color='green', label='GAN (train)', linestyle='--')
-
-plt.plot(l_samples_norm, l_vae_test, '->', alpha=0.6, color='red', label='VAE (test)')
-plt.plot(l_samples_norm, l_vae_train, '->', alpha=0.6, color='red', label='VAE (train)', linestyle='--')
-
-plt.plot(l_samples_norm, l_base_train, '-s', alpha=0.6, color='gray', label='Indep. Baseline')
-
-plt.plot(l_samples_norm, l_perfect_train, '-d', alpha=0.6, color='blue', label='Perfect')
-
-plt.xlabel('samples generated / number of total combinations')
-plt.ylabel('recall')
-plt.legend(loc='best')
-plt.savefig('{}/recall_merged.pdf'.format(output_dir))
-
