@@ -30,6 +30,10 @@ parser.add_argument('--debug', default=0, type=int, dest='DEBUG_TEST', help='for
 parser.add_argument('--penalty', default=0., type=float, dest='PENALTY', help='gradient penalty')
 parser.add_argument('--lr', default=0.001, type=float, dest='LR', help='gradient penalty')
 parser.add_argument('--cuda', default=1, type=int, dest='CUDA', help='use cuda')
+parser.add_argument('--pvisual', default='test_visual_samplers', help='visual distribution')
+parser.add_argument('--qvisual', default='test_visual_samplers', help='visual distribution')
+parser.add_argument('--psymbol', default='sum_25.train_positive', help='symbolic distribution')
+parser.add_argument('--qsymbol', default='sum_25.train_negative', help='symbolic distribution')
 
 p = parser.parse_args()
 device = 'cuda:0' if p.CUDA else 'cpu'
@@ -157,16 +161,16 @@ for i in xrange(10):
     vae.to(device)
     vae_visual_samplers.append(digits_sampler.VaeVisualSampler(vae, device=device))
 #####################################################
-print 'Loading MNIST digits'
-
+# Load data for side task
 # Load individual MNIST digits
 test_visual_samplers = []
+all_mnist_digit = digits_sampler.load_all_mnist_digits(train=False)
 for i in xrange(10):
     print 'Loading digit', i
-    test_digit = digits_sampler.load_one_mnist_digit(i, train=False, debug=p.DEBUG_TEST)
-    digit_test_iter = make_infinite(
-        torch.utils.data.DataLoader(test_digit, batch_size=1, shuffle=True))
+    digit_test_iter = digits_sampler.make_infinite(
+        torch.utils.data.DataLoader(all_mnist_digit[i], batch_size=1, shuffle=True))
     test_visual_samplers.append(digits_sampler.DatasetVisualSampler(digit_test_iter))
+print 'Not using any transforms, ensure models match that assumption!'
 #####################################################
 
 
@@ -175,10 +179,15 @@ for i in xrange(10):
 sum_25 = get_problem('sum_25', 'int', train_ratio=p.TRAIN_RATIO)
 
 # Training Visual Distributions
-train_p_visual = test_visual_samplers
-train_q_visual = test_visual_samplers
-train_p_symbolic = sum_25.train_positive
-train_q_symbolic = sum_25.train_negative
+train_p_visual = eval(p.pvisual)
+train_q_visual = eval(p.qvisual)
+train_p_symbolic = eval(p.psymbol)
+train_q_symbolic = eval(p.qsymbol)
+
+#train_p_visual = test_visual_samplers
+#train_q_visual = test_visual_samplers
+#train_p_symbolic = sum_25.train_positive
+#train_q_symbolic = sum_25.train_negative
 
 eval_pairs = {}
 
