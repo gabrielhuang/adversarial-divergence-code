@@ -40,6 +40,7 @@ def sync_from_disk():
     all_stats = set()
     for subfolder in subfolders:
         path = os.path.join(root_dir, subfolder)
+        print 'Opening', path
         with open('{}/stats.json'.format(path), 'rb') as fp:
             stat = json.load(fp)
             stats.append(stat)
