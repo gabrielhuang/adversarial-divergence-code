@@ -3,7 +3,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
-import hyperplane_dataset
 from tqdm import tqdm
 import os
 from collections import OrderedDict
@@ -15,7 +14,7 @@ from common import digits_sampler
 
 # How many runs? (samples will be divided by that number)
 n_runs = 1  # 5 - change to more
-n_points = 5 # 30
+n_points = 30 # 30
 problem_file = '../end2end/sum_25.pkl'
 output_dir = 'plots'
 
