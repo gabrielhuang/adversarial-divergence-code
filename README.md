@@ -1,6 +1,6 @@
 # Code for paper Adversarial Divergence
 
-## MILA-8
+## Thin-8
 
 In this folder, we try to generate high-resolution images of the digit-8,
 using a (de)convolutional VAE and a GAN. The goal is to see how important is the impact
